@@ -11,7 +11,12 @@ import json
 import os
 from abc import ABC, abstractmethod
 from typing import List, Set, Dict, Any
-from clang.cindex import Index, CursorKind
+from clang.cindex import (
+    Index,
+    CursorKind,
+    CompilationDatabase,
+    CompilationDatabaseError,
+)
 
 # --- Constants ---
 
@@ -153,6 +158,83 @@ def collect_types(cursor, collected_types: List[TypeInfo], tu, args):
         collect_types(child, collected_types, tu, args)
 
 
+# --- CDB ---
+
+
+class DatabaseHandler:
+    def __init__(self, build_path=None):
+        self.db = None
+        if build_path:
+            try:
+                self.db = CompilationDatabase.fromDirectory(build_path)
+                print(f"Loaded compilation database from: {build_path}")
+            except CompilationDatabaseError:
+                print(
+                    f"Warning: Could not load compilation database from {build_path}",
+                    file=sys.stderr,
+                )
+
+    def _find_db_upwards(self, source_file):
+        """Walks up the directory tree looking for compile_commands.json"""
+        d = os.path.dirname(os.path.abspath(source_file))
+        root = os.path.abspath(os.sep)
+
+        while d != root:
+            if os.path.exists(os.path.join(d, "compile_commands.json")):
+                return d
+            if os.path.exists(
+                os.path.join(d, "/", "build", "/", "compile_commands.json")
+            ):
+                return os.path.join(d, "build")
+            d = os.path.dirname(d)
+        return None
+
+    def get_compile_args(self, source_file):
+        """
+        Returns a list of compiler arguments for the given file.
+        Prioritizes the loaded DB. Falls back to auto-detection.
+        """
+        abs_source = os.path.abspath(source_file)
+        if not self.db:
+            found_path = self._find_db_upwards(abs_source)
+            if found_path:
+                print(f"Auto-detected compilation database at: {found_path}")
+                try:
+                    self.db = CompilationDatabase.fromDirectory(found_path)
+                except CompilationDatabaseError:
+                    pass  # Silently fail auto-detection and fallback to defaults
+        if not self.db:
+            return []
+        cmds = self.db.getCompileCommands(abs_source)
+        if not cmds:
+            print(
+                f"Warning: File '{source_file}' not found in compilation database.",
+                file=sys.stderr,
+            )
+            return []
+
+        # The .arguments list, e.g.: ['/usr/bin/c++', '-DDEF', '-c', 'file.cpp', '-o', 'file.o']
+        raw_args = list(cmds[0].arguments)
+
+        cleaned_args = []
+        skip_next = False
+
+        for arg in raw_args[1:]:
+            if skip_next:
+                skip_next = False
+                continue
+            if arg == "-o":
+                skip_next = True
+                continue
+            if arg == "-c":
+                continue
+            if arg == source_file or os.path.abspath(arg) == abs_source:
+                continue
+            cleaned_args.append(arg)
+
+        return cleaned_args
+
+
 # --- Main ---
 
 
@@ -195,9 +277,17 @@ def parse_arguments():
     )
 
     parser.add_argument(
-        "clang_args",
+        "-p",
+        "--build-dir",
+        help="Path to the build directory containing compile_commands.json",
+    )
+
+    parser.add_argument("source_file", help="The source file to parse")
+
+    parser.add_argument(
+        "clang_extra_args",
         nargs=argparse.REMAINDER,
-        help="Filename followed by Clang arguments",
+        help="Extra arguments to pass to Clang",
     )
 
     return parser.parse_args()
@@ -206,12 +296,17 @@ def parse_arguments():
 def main():
     args = parse_arguments()
 
-    if not args.clang_args:
+    if not args.source_file:
         print("Error: No input file specified.", file=sys.stderr)
         sys.exit(1)
 
+    db_handler = DatabaseHandler(args.build_dir)
+    db_args = db_handler.get_compile_args(args.source_file)
+
+    # index = Index.create()
+    # tu = index.parse(None, args.clang_args)
     index = Index.create()
-    tu = index.parse(None, args.clang_args)
+    tu = index.parse(args.source_file, args=db_args or args.clang_extra_args)
 
     if not tu:
         print("Error: Unable to load input.", file=sys.stderr)

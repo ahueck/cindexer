@@ -6,7 +6,8 @@ import lit.util
 import lit.formats
 
 config.name = "cindexer-tsestsuite"
-config.suffixes = [".c", ".cpp"]
+config.suffixes = [".c", ".cpp", ".sh"]
+config.excludes = ["cmake_project"]
 config.test_format = lit.formats.ShTest(True)
 
 project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -22,9 +23,11 @@ def find_tool(name):
 
 
 filecheck_path = find_tool("FileCheck")
+cmake_path = find_tool("cmake")
 
 config.environment["PYTHONPATH"] = os.environ.get("PYTHONPATH", "")
 config.environment["LD_LIBRARY_PATH"] = os.environ.get("LD_LIBRARY_PATH", "")
 
 config.substitutions.append(("%dump_types", f'"{python_exec}" "{tool_path}"'))
 config.substitutions.append(("%filecheck", f'"{filecheck_path}"'))
+config.substitutions.append(("%cmake", f'"{cmake_path}"'))
