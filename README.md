@@ -29,13 +29,13 @@ python3 cindex-pass.py --user-def main.cpp
 
 ### Options
 
-| Flag | Description |
-| --- | --- |
-| `--user-def` | Enable dumping of user-defined types and aliases. |
-| `--scope {main,all}` | `main` (default): Only types in the source file. `all`: Includes system headers. |
-| `--decls {defs,all}` | `defs` (default): Only definitions. `all`: Includes forward declarations. |
-| `--format {text,json}` | Output format. Default is `text`. |
-| `--location` | Include file path and line numbers in text output. |
+| Flag                   | Description                                                                      |
+|------------------------|----------------------------------------------------------------------------------|
+| `--user-def`           | Enable dumping of user-defined types and aliases.                                |
+| `--scope {main,all}`   | `main` (default): Only types in the source file. `all`: Includes system headers. |
+| `--decls {defs,all}`   | `defs` (default): Only definitions. `all`: Includes forward declarations.        |
+| `--format {text,json}` | Output format. Default is `text`.                                                |
+| `--location`           | Include file path and line numbers in text output.                               |
 
 ### Advanced Examples
 
@@ -59,8 +59,11 @@ python3 cindex-pass.py --user-def source.cpp -- -I/usr/local/include -std=c++17
 
 ## Testing
 
-The test suite parses files in `tests/data/` and verifies output against `// CHECK:` comments inside the source files.
+The test suite parses requirements 
+- llvm-lit: `pip install lit`.
+- FileCheck
+- CMake
 
 ```bash
-python3 -m unittest tests/test_runner.py
+lit -v tests/
 ```
