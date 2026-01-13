@@ -4,8 +4,8 @@ import sys
 import lit.util
 import lit.formats
 
-config.name = 'cindexerTestsuite'
-config.suffixes = ['.c', '.cpp']
+config.name = "cindexerTestsuite"
+config.suffixes = [".c", ".cpp"]
 config.test_format = lit.formats.ShTest(True)
 
 project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -19,10 +19,11 @@ def find_tool(name):
         return path
     return name
 
+
 filecheck_path = find_tool("FileCheck")
 
-config.environment['PYTHONPATH'] = os.environ.get('PYTHONPATH', '')
-config.environment['LD_LIBRARY_PATH'] = os.environ.get('LD_LIBRARY_PATH', '')
+config.environment["PYTHONPATH"] = os.environ.get("PYTHONPATH", "")
+config.environment["LD_LIBRARY_PATH"] = os.environ.get("LD_LIBRARY_PATH", "")
 
-config.substitutions.append(('%dump_types', f'"{python_exec}" "{tool_path}"'))
-config.substitutions.append(('%filecheck', f'"{filecheck_path}"'))
+config.substitutions.append(("%dump_types", f'"{python_exec}" "{tool_path}"'))
+config.substitutions.append(("%filecheck", f'"{filecheck_path}"'))
