@@ -14,11 +14,13 @@ project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 tool_path = os.path.join(project_root, "cindex-pass.py")
 python_exec = sys.executable
 
+
 def find_tool(name):
     path = shutil.which(name)
     if path:
         return path
     return name
+
 
 filecheck_path = find_tool("FileCheck")
 cmake_path = find_tool("cmake")
@@ -28,9 +30,13 @@ cmake_path = find_tool("cmake")
 use_coverage = os.environ.get("CINDEXER_USE_COVERAGE")
 
 if use_coverage:
-    executable_cmd = f'{python_exec} -m coverage run'
-    config.environment['COVERAGE_PROCESS_START'] = os.path.join(project_root, ".coveragerc")
-    config.environment['COVERAGE_FILE'] = os.path.join(project_root, 'tests', '.coverage')
+    executable_cmd = f"{python_exec} -m coverage run"
+    config.environment["COVERAGE_PROCESS_START"] = os.path.join(
+        project_root, ".coveragerc"
+    )
+    config.environment["COVERAGE_FILE"] = os.path.join(
+        project_root, "tests", ".coverage"
+    )
 else:
     executable_cmd = python_exec
 
