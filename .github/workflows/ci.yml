@@ -61,9 +61,8 @@ jobs:
         env:
           CINDEXER_USE_COVERAGE: "1"
         run: |
-          lit -v tests/
+          lit -j 1 -v tests/
 
       - name: Generate coverage report
         run: |
-          coverage combine tests/
-          coverage report
+          coverage report --data-file=tests/.coverage
