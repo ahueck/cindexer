@@ -1,10 +1,11 @@
+# flake8: noqa: F821
 import os
 import shutil
 import sys
 import lit.util
 import lit.formats
 
-config.name = "cindexerTestsuite"
+config.name = "cindexer-tsestsuite"
 config.suffixes = [".c", ".cpp"]
 config.test_format = lit.formats.ShTest(True)
 
