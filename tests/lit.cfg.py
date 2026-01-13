@@ -6,7 +6,8 @@ import lit.util
 import lit.formats
 
 config.name = "cindexer-tsestsuite"
-config.suffixes = [".c", ".cpp"]
+config.suffixes = [".c", ".cpp", '.sh']
+config.excludes = ['cmake_project']
 config.test_format = lit.formats.ShTest(True)
 
 project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
