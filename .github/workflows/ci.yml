@@ -64,7 +64,6 @@ jobs:
           lit -v tests/
 
       - name: Generate coverage report
-        working-directory: tests
         run: |
-          coverage combine
+          coverage combine tests/
           coverage report
