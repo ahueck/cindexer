@@ -48,13 +48,14 @@ jobs:
       - name: Install Python dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install libclang
+          pip install libclang lit
 
-      - name: Configure libClang path
+      - name: Configure Clang path
         run: |
+          LLVM_BIN_DIR=$(llvm-config --bindir)
           LLVM_LIB_PATH=$(llvm-config --libdir)
-          echo "Found LLVM Lib Path: $LLVM_LIB_PATH"
+          echo "$LLVM_BIN_DIR" >> $GITHUB_PATH
           echo "LD_LIBRARY_PATH=$LLVM_LIB_PATH" >> $GITHUB_ENV
 
-      - name: Run Tests
-        run: python -m unittest tests/test_dump_types.py
+      - name: Run lit tests
+        run: lit -v tests/
