@@ -30,7 +30,7 @@ cmake_path = find_tool("cmake")
 use_coverage = os.environ.get("CINDEXER_USE_COVERAGE")
 
 if use_coverage:
-    executable_cmd = f"{python_exec} -m coverage run"
+    executable_cmd = f"{python_exec} -m coverage run -p"
     config.environment["COVERAGE_PROCESS_START"] = os.path.join(
         project_root, ".coveragerc"
     )

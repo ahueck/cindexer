@@ -1,0 +1,3 @@
+struct HeaderStruct {
+    int h;
+};
