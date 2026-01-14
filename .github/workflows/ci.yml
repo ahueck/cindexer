@@ -65,4 +65,5 @@ jobs:
 
       - name: Generate coverage report
         run: |
-          coverage report --data-file=tests/.coverage
+          coverage combine tests/
+          coverage report
