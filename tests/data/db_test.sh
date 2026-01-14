@@ -15,7 +15,7 @@
 # Test 2: Invalid build directory
 # RUN: %dump_types --user-def --format=text -p %t/nonexistent/path %t/proj/src/test.cpp 2>&1 | %filecheck %s --check-prefix=BAD-DB
 
-# BAD-DB: Warning: Could not load compilation database from %t/nonexistent/path
+# BAD-DB: Warning: Could not load compilation database from {{.*}}nonexistent/path
 
 # Test 4: Truly no database found anywhere
 # RUN: touch %t/no_db.c

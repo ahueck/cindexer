@@ -182,9 +182,7 @@ class DatabaseHandler:
         while d != root:
             if os.path.exists(os.path.join(d, "compile_commands.json")):
                 return d
-            if os.path.exists(
-                os.path.join(d, "build", "compile_commands.json")
-            ):
+            if os.path.exists(os.path.join(d, "build", "compile_commands.json")):
                 return os.path.join(d, "build")
             d = os.path.dirname(d)
         return None
