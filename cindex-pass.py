@@ -88,7 +88,7 @@ class TextFormatter(Formatter):
 
     def output(self, type_infos: List[TypeInfo], show_location: bool):
         # Group by category for cleaner display
-        grouped = {}
+        grouped = {"UserDefined": [], "Alias": []}
         for info in type_infos:
             grouped.setdefault(info.category, []).append(info)
 
@@ -182,9 +182,7 @@ class DatabaseHandler:
         while d != root:
             if os.path.exists(os.path.join(d, "compile_commands.json")):
                 return d
-            if os.path.exists(
-                os.path.join(d, "/", "build", "/", "compile_commands.json")
-            ):
+            if os.path.exists(os.path.join(d, "build", "compile_commands.json")):
                 return os.path.join(d, "build")
             d = os.path.dirname(d)
         return None
@@ -206,7 +204,7 @@ class DatabaseHandler:
         if not self.db:
             return []
         cmds = self.db.getCompileCommands(abs_source)
-        if not cmds:
+        if cmds is None or len(cmds) == 0:
             print(
                 f"Warning: File '{source_file}' not found in compilation database.",
                 file=sys.stderr,
@@ -296,17 +294,16 @@ def parse_arguments():
 def main():
     args = parse_arguments()
 
-    if not args.source_file:
-        print("Error: No input file specified.", file=sys.stderr)
-        sys.exit(1)
-
     db_handler = DatabaseHandler(args.build_dir)
     db_args = db_handler.get_compile_args(args.source_file)
 
     # index = Index.create()
     # tu = index.parse(None, args.clang_args)
     index = Index.create()
-    tu = index.parse(args.source_file, args=db_args or args.clang_extra_args)
+    try:
+        tu = index.parse(args.source_file, args=db_args or args.clang_extra_args)
+    except Exception:
+        tu = None
 
     if not tu:
         print("Error: Unable to load input.", file=sys.stderr)
