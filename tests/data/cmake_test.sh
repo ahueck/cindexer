@@ -1,3 +1,4 @@
+# RUN: rm -rf %t
 # RUN: mkdir -p %t/build
 # RUN: %cmake -S %S/cmake_project -B %t/build -DCMAKE_EXPORT_COMPILE_COMMANDS=ON > /dev/null
 
