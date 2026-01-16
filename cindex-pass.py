@@ -10,15 +10,14 @@ import argparse
 import json
 import os
 from abc import ABC, abstractmethod
-from typing import List, Set, Dict, Any
+from typing import List, Set, Dict, Any, Optional, Tuple
+from dataclasses import dataclass, asdict
 from clang.cindex import (
     Index,
     CursorKind,
     CompilationDatabase,
     CompilationDatabaseError,
 )
-
-# --- Constants ---
 
 USER_DEFINED_KINDS = {
     CursorKind.STRUCT_DECL: "Struct",
@@ -30,37 +29,51 @@ USER_DEFINED_KINDS = {
 
 ALIAS_KINDS = {CursorKind.TYPEDEF_DECL: "Typedef", CursorKind.TYPE_ALIAS_DECL: "Using"}
 
-# --- Data Objects ---
 
-
+@dataclass
 class TypeInfo:
     """
     Holds structured information about a parsed type.
     Decouples data extraction from output formatting.
     """
 
-    def __init__(self, cursor, category: str):
-        self.name = cursor.spelling
-        self.kind = self._get_readable_kind(cursor)
-        self.category = category  # 'UserDefined' or 'Alias'
-        self.is_definition = cursor.is_definition()
-        self.filename = (
-            cursor.location.file.name if cursor.location.file else "<unknown>"
-        )
-        self.line = cursor.location.line
-        self.column = cursor.location.column
+    name: str
+    usr: str
+    kind: str
+    category: str
+    is_definition: bool
+    filename: str
+    line: int
+    column: int
+    tu_source: str
 
-    def _get_readable_kind(self, cursor) -> str:
+    @staticmethod
+    def _get_readable_kind(cursor) -> str:
         if cursor.kind in USER_DEFINED_KINDS:
             return USER_DEFINED_KINDS[cursor.kind]
         if cursor.kind in ALIAS_KINDS:
             return ALIAS_KINDS[cursor.kind]
         return str(cursor.kind)
 
+    @staticmethod
+    def from_cursor(cursor, category: str, tu_source: str) -> "TypeInfo":
+        return TypeInfo(
+            name=cursor.spelling,
+            usr=cursor.get_usr(),
+            kind=TypeInfo._get_readable_kind(cursor),
+            category=category,
+            is_definition=cursor.is_definition(),
+            filename=cursor.location.file.name if cursor.location.file else "<unknown>",
+            line=cursor.location.line,
+            column=cursor.location.column,
+            tu_source=tu_source,
+        )
+
     def to_dict(self) -> Dict[str, Any]:
         """Convert to dictionary for JSON serialization."""
         return {
             "name": self.name,
+            "usr": self.usr,
             "kind": self.kind,
             "category": self.category,
             "is_definition": self.is_definition,
@@ -69,10 +82,209 @@ class TypeInfo:
                 "line": self.line,
                 "column": self.column,
             },
+            "tu_source": self.tu_source,
         }
 
 
-# --- Formatters ---
+@dataclass
+class DependencyInfo:
+    path: str
+    mtime: float
+    is_system: bool
+
+
+@dataclass(frozen=True)
+class CacheEntry:
+    source_path: str
+    compile_signature: Tuple[str, ...]
+    source_mtime: float
+    type_infos: List[TypeInfo]
+    dependencies: Dict[str, DependencyInfo]
+
+
+def collect_all_types(cursor, collected_types: List[TypeInfo], tu_source: str):
+    """
+    Traverse AST and populate collected_types list with TypeInfo objects.
+    Extracts ALL named types without filtering.
+    """
+    # Ignore types without location
+    if cursor.location.file:
+        category = None
+        if cursor.kind in USER_DEFINED_KINDS:
+            category = "UserDefined"
+        elif cursor.kind in ALIAS_KINDS:
+            category = "Alias"
+
+        if category and cursor.spelling:
+            collected_types.append(TypeInfo.from_cursor(cursor, category, tu_source))
+
+    for child in cursor.get_children():
+        collect_all_types(child, collected_types, tu_source)
+
+
+class TranslationUnitCache:
+    """
+    Manages caching of parsed translation units.
+    Validates cache entries based on file modification times.
+    """
+
+    def __init__(self):
+        self._cache: Dict[Tuple[str, Tuple[str, ...]], CacheEntry] = {}
+
+    def get(self, source_path: str, signature: Tuple[str, ...]) -> Optional[CacheEntry]:
+        key = (source_path, signature)
+        entry = self._cache.get(key)
+        if not entry:
+            return None
+
+        try:
+            current_mtime = os.path.getmtime(source_path)
+        except OSError:
+            # Handle deleted file
+            del self._cache[key]
+            return None
+
+        if current_mtime != entry.source_mtime:
+            # Invalidate if modified
+            del self._cache[key]
+            return None
+
+        for dep_path, dep_info in entry.dependencies.items():
+            # Skip system headers per requirements
+            if dep_info.is_system:
+                continue
+
+            try:
+                dep_mtime = os.path.getmtime(dep_path)
+                if dep_mtime != dep_info.mtime:
+                    del self._cache[key]
+                    return None
+            except OSError:
+                del self._cache[key]
+                return None
+
+        return entry
+
+    def put(
+        self,
+        source_path: str,
+        signature: Tuple[str, ...],
+        type_infos: List[TypeInfo],
+        dependencies: Dict[str, DependencyInfo],
+    ):
+        try:
+            source_mtime = os.path.getmtime(source_path)
+        except OSError:
+            return
+
+        entry = CacheEntry(
+            source_path=source_path,
+            compile_signature=signature,
+            source_mtime=source_mtime,
+            type_infos=type_infos,
+            dependencies=dependencies,
+        )
+        self._cache[(source_path, signature)] = entry
+
+
+class IndexManager:
+    """
+    Coordinates parsing, caching, and query-time filtering.
+    """
+
+    def __init__(self, project_root: str, build_dir: Optional[str] = None):
+        self.project_root = os.path.abspath(project_root)
+        self.index = Index.create()
+        self.cache = TranslationUnitCache()
+        self.args_resolver = CompilationArgsResolver(self.project_root)
+        self.db_handler = DatabaseHandler(build_dir)
+
+    def get_types(
+        self,
+        source_file: str,
+        extra_args: Optional[List[str]] = None,
+        filter_opts: Optional[Dict] = None,
+    ) -> List[TypeInfo]:
+        source_file = os.path.abspath(source_file)
+
+        db_args = self.db_handler.get_compile_args(source_file)
+        full_args = (db_args or []) + (extra_args or [])
+
+        signature = self.args_resolver.resolve(full_args, source_file)
+
+        cached_entry = self.cache.get(source_file, signature)
+
+        type_infos = []
+
+        if cached_entry:
+            type_infos = cached_entry.type_infos
+        else:
+            try:
+                # Use resolved args for consistency; libclang ignores removed flags (-c, -o)
+                parse_args = list(signature)
+
+                tu = self.index.parse(source_file, args=parse_args)
+                if not tu:
+                    raise Exception("TranslationUnit is None")
+
+                all_types: List[TypeInfo] = []
+                collect_all_types(tu.cursor, all_types, source_file)
+                type_infos = all_types
+
+                dependencies: Dict[str, DependencyInfo] = {}
+                for include in tu.get_includes():
+                    path = os.path.abspath(include.include.name)
+                    try:
+                        mtime = os.path.getmtime(path)
+                        # Treat headers outside project root as system (heuristic)
+                        is_system = False
+                        if not path.startswith(self.project_root):
+                            is_system = True
+
+                        dependencies[path] = DependencyInfo(
+                            path=path, mtime=mtime, is_system=is_system
+                        )
+                    except OSError:
+                        pass
+
+                self.cache.put(source_file, signature, type_infos, dependencies)
+
+            except Exception as e:
+                print(f"Error parsing {source_file}: {e}", file=sys.stderr)
+                return []
+
+        if not filter_opts:
+            return type_infos
+
+        return TypeFilter.filter(
+            type_infos,
+            filter_opts.get("scope", "main"),
+            filter_opts.get("decls", "defs"),
+            source_file,
+        )
+
+
+class TypeFilter:
+    """
+    Applies query-time filters to a list of TypeInfo objects.
+    """
+
+    @staticmethod
+    def filter(
+        type_infos: List[TypeInfo], scope: str, decls: str, main_file: str
+    ) -> List[TypeInfo]:
+        filtered = []
+        for info in type_infos:
+            if scope == "main":
+                if info.filename != main_file:
+                    continue
+
+            if decls == "defs":
+                if not info.is_definition:
+                    continue
+
+            filtered.append(info)
+        return filtered
 
 
 class Formatter(ABC):
@@ -87,7 +299,6 @@ class TextFormatter(Formatter):
     """Output results in a human-readable, line-by-line format."""
 
     def output(self, type_infos: List[TypeInfo], show_location: bool):
-        # Group by category for cleaner display
         grouped = {"UserDefined": [], "Alias": []}
         for info in type_infos:
             grouped.setdefault(info.category, []).append(info)
@@ -98,7 +309,6 @@ class TextFormatter(Formatter):
                 print("  (None found)")
                 continue
 
-            # Sort by name for readability
             for item in sorted(items, key=lambda x: x.name):
                 loc_str = ""
                 if show_location:
@@ -114,7 +324,6 @@ class JsonFormatter(Formatter):
 
     def output(self, type_infos: List[TypeInfo], show_location: bool):
         data = [t.to_dict() for t in type_infos]
-        # If user strictly requested NO location in JSON, we strip it out.
         if not show_location:
             for item in data:
                 del item["location"]
@@ -122,43 +331,60 @@ class JsonFormatter(Formatter):
         print(json.dumps(data, indent=2))
 
 
-# --- Logic ---
-
-
-def should_process_cursor(cursor, tu, scope_mode) -> bool:
-    if scope_mode == "all":
-        return True
-    if not cursor.location.file:
-        return False
-    return cursor.location.file.name == tu.spelling
-
-
-def should_record_decl(cursor, decl_mode) -> bool:
-    if decl_mode == "all":
-        return True
-    return cursor.is_definition()
-
-
-def collect_types(cursor, collected_types: List[TypeInfo], tu, args):
+class CompilationArgsResolver:
     """
-    Traverse AST and populate collected_types list with TypeInfo objects.
+    Canonicalizes compilation arguments to ensure stable signatures.
     """
-    if should_process_cursor(cursor, tu, args.scope):
-        category = None
-        if cursor.kind in USER_DEFINED_KINDS:
-            category = "UserDefined"
-        elif cursor.kind in ALIAS_KINDS:
-            category = "Alias"
 
-        if category and cursor.spelling:
-            if should_record_decl(cursor, args.decls):
-                collected_types.append(TypeInfo(cursor, category))
+    def __init__(self, root_dir: str):
+        self.root_dir = os.path.abspath(root_dir)
 
-    for child in cursor.get_children():
-        collect_types(child, collected_types, tu, args)
+    def resolve(self, args: List[str], source_file: str) -> Tuple[str, ...]:
+        """
+        Produces a canonical signature tuple of compile arguments.
+        - Resolves relative paths in -I, -isystem to absolute.
+        - Removes -o, -c, and the source file itself.
+        - Preserves order of semantic flags.
+        """
+        canonical = []
+        skip_next = False
+        abs_source = os.path.abspath(source_file)
 
+        for i, arg in enumerate(args):
+            if skip_next:
+                skip_next = False
+                continue
 
-# --- CDB ---
+            if arg == "-o":
+                skip_next = True
+                continue
+            if arg == "-c":
+                continue
+            if arg == source_file or os.path.abspath(arg) == abs_source:
+                continue
+
+            # Handle -I and -isystem, resolving relative paths
+            # Also arg variation like: -I /path/ or -I/path/
+            if arg.startswith("-I") or arg.startswith("-isystem"):
+                if len(arg) > 2 and arg.startswith("-I"):
+                    path = arg[2:]
+                    abs_path = os.path.abspath(os.path.join(self.root_dir, path))
+                    canonical.append(f"-I{abs_path}")
+                    continue
+                if arg in ["-I", "-isystem"]:
+                    canonical.append(arg)
+                    if i + 1 < len(args):
+                        next_arg = args[i + 1]
+                        abs_path = os.path.abspath(
+                            os.path.join(self.root_dir, next_arg)
+                        )
+                        canonical.append(abs_path)
+                        skip_next = True
+                    continue
+
+            canonical.append(arg)
+
+        return tuple(canonical)
 
 
 class DatabaseHandler:
@@ -191,6 +417,8 @@ class DatabaseHandler:
         """
         Returns a list of compiler arguments for the given file.
         Prioritizes the loaded DB. Falls back to auto-detection.
+        Returns raw arguments (excluding compiler binary) without filtering,
+        as CompilationArgsResolver handles filtering and canonicalization.
         """
         abs_source = os.path.abspath(source_file)
         if not self.db:
@@ -211,29 +439,9 @@ class DatabaseHandler:
             )
             return []
 
-        # The .arguments list, e.g.: ['/usr/bin/c++', '-DDEF', '-c', 'file.cpp', '-o', 'file.o']
         raw_args = list(cmds[0].arguments)
 
-        cleaned_args = []
-        skip_next = False
-
-        for arg in raw_args[1:]:
-            if skip_next:
-                skip_next = False
-                continue
-            if arg == "-o":
-                skip_next = True
-                continue
-            if arg == "-c":
-                continue
-            if arg == source_file or os.path.abspath(arg) == abs_source:
-                continue
-            cleaned_args.append(arg)
-
-        return cleaned_args
-
-
-# --- Main ---
+        return raw_args[1:]
 
 
 def parse_arguments():
@@ -294,31 +502,34 @@ def parse_arguments():
 def main():
     args = parse_arguments()
 
-    db_handler = DatabaseHandler(args.build_dir)
-    db_args = db_handler.get_compile_args(args.source_file)
+    project_root = os.getcwd()
+    if args.build_dir:
+        project_root = os.path.dirname(os.path.abspath(args.build_dir))
 
-    # index = Index.create()
-    # tu = index.parse(None, args.clang_args)
-    index = Index.create()
+    manager = IndexManager(project_root=project_root, build_dir=args.build_dir)
+
+    filter_opts = {
+        "scope": args.scope,
+        "decls": args.decls,
+    }
+
     try:
-        tu = index.parse(args.source_file, args=db_args or args.clang_extra_args)
-    except Exception:
-        tu = None
-
-    if not tu:
-        print("Error: Unable to load input.", file=sys.stderr)
+        type_infos = manager.get_types(
+            source_file=args.source_file,
+            extra_args=args.clang_extra_args,
+            filter_opts=filter_opts,
+        )
+    except Exception as e:
+        print(f"Error: {e}", file=sys.stderr)
         sys.exit(1)
 
     if args.user_def:
-        collected_data: List[TypeInfo] = []
-        collect_types(tu.cursor, collected_data, tu, args)
-
         formatter: Formatter
         if args.format == "json":
             formatter = JsonFormatter()
         else:
             formatter = TextFormatter()
-        formatter.output(collected_data, args.location)
+        formatter.output(type_infos, args.location)
 
 
 if __name__ == "__main__":
