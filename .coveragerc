@@ -1,6 +1,8 @@
 [run]
 branch = True
 parallel = True
-source = ./
+include = cindex-pass.py
+
 omit = 
+    */tests/*
     */site-packages/*
