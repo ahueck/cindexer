@@ -38,25 +38,38 @@ class TestUnits(unittest.TestCase):
         # Mocking raw DB output: compiler + flags
         # The DatabaseHandler.get_compile_args returns raw_args[1:]
         # which should then be passed to CompilationArgsResolver.resolve
-        
+
         source = os.path.join(self.test_dir, "test.c")
         with open(source, "w") as f:
             f.write("int main() { return 0; }")
 
         # Mocking what DatabaseHandler would get from cmds[0].arguments
-        raw_db_args = ["/usr/bin/gcc", "-DDEBUG", "-c", source, "-o", "test.o", "-I", "inc"]
-        
+        raw_db_args = [
+            "/usr/bin/gcc",
+            "-DDEBUG",
+            "-c",
+            source,
+            "-o",
+            "test.o",
+            "-I",
+            "inc",
+        ]
+
         # Simulating DatabaseHandler.get_compile_args(source) -> raw_db_args[1:]
         db_args = raw_db_args[1:]
-        
+
         resolver = CompilationArgsResolver(self.test_dir)
         # extra_args might be empty
         full_args = db_args + []
-        
+
         signature = resolver.resolve(full_args, source)
-        
+
         # Expected: -DDEBUG, -I{abs_inc}
-        expected = ("-DDEBUG", "-I", os.path.abspath(os.path.join(self.test_dir, "inc")))
+        expected = (
+            "-DDEBUG",
+            "-I",
+            os.path.abspath(os.path.join(self.test_dir, "inc")),
+        )
         self.assertEqual(signature, expected)
 
     def test_args_resolver_c_flag(self):
