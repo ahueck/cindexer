@@ -95,7 +95,7 @@ class TestIndexManager(unittest.TestCase):
         args = ["-I", self.test_dir]
 
         manager.get_types(self.source_file, args)
-        
+
         # Verify cached
         _, hit = manager.get_types(self.source_file, args)
         self.assertTrue(hit)
@@ -112,7 +112,7 @@ class TestIndexManager(unittest.TestCase):
         args = ["-I", self.test_dir]
 
         manager.get_types(self.source_file, args)
-        
+
         # Verify cached
         _, hit = manager.get_types(self.source_file, args)
         self.assertTrue(hit)
