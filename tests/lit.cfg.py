@@ -11,7 +11,7 @@ config.excludes = ["cmake_project", "lit.cfg.py"]
 config.test_format = lit.formats.ShTest(True)
 
 project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-tool_path = os.path.join(project_root, "cindex-pass.py")
+tool_path = os.path.join(project_root, "cindexer.py")
 python_exec = sys.executable
 
 

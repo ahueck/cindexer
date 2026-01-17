@@ -4,19 +4,13 @@ import unittest
 import sys
 import os
 import time
-import importlib.util
 
-# Load cindex-pass.py module
+# Load cindexer module
 project_root = os.path.dirname(
     os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 )
-module_path = os.path.join(project_root, "cindex-pass.py")
-
-spec = importlib.util.spec_from_file_location("cindex_pass", module_path)
-cindex_pass = importlib.util.module_from_spec(spec)
-spec.loader.exec_module(cindex_pass)
-
-IndexManager = cindex_pass.IndexManager
+sys.path.insert(0, project_root)
+from cindexer import IndexManager
 
 
 class TestIndexManager(unittest.TestCase):

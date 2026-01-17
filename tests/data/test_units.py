@@ -3,21 +3,17 @@
 import unittest
 import sys
 import os
-import importlib.util
 import time
 import tempfile
 import shutil
 from unittest.mock import MagicMock, patch
 
-# Load cindex-pass.py module
+# Load cindexer module
 project_root = os.path.dirname(
     os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 )
-module_path = os.path.join(project_root, "cindex-pass.py")
-
-spec = importlib.util.spec_from_file_location("cindex_pass", module_path)
-cindex_pass = importlib.util.module_from_spec(spec)
-spec.loader.exec_module(cindex_pass)
+sys.path.insert(0, project_root)
+import cindexer as cindex_pass
 
 IndexManager = cindex_pass.IndexManager
 TranslationUnitCache = cindex_pass.TranslationUnitCache
