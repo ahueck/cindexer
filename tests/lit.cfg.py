@@ -6,12 +6,12 @@ import lit.util
 import lit.formats
 
 config.name = "cindexer-testsuite"
-config.suffixes = [".c", ".cpp", ".sh"]
-config.excludes = ["cmake_project"]
+config.suffixes = [".c", ".cpp", ".sh", ".py"]
+config.excludes = ["cmake_project", "lit.cfg.py"]
 config.test_format = lit.formats.ShTest(True)
 
 project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-tool_path = os.path.join(project_root, "cindex-pass.py")
+tool_path = os.path.join(project_root, "cindexer.py")
 python_exec = sys.executable
 
 
@@ -30,10 +30,9 @@ cmake_path = find_tool("cmake")
 use_coverage = os.environ.get("CINDEXER_USE_COVERAGE")
 
 if use_coverage:
-    executable_cmd = f"{python_exec} -m coverage run -p"
-    config.environment["COVERAGE_PROCESS_START"] = os.path.join(
-        project_root, ".coveragerc"
-    )
+    rc_file = os.path.join(project_root, ".coveragerc")
+    executable_cmd = f"{python_exec} -m coverage run --rcfile={rc_file} -p"
+    config.environment["COVERAGE_PROCESS_START"] = rc_file
     config.environment["COVERAGE_FILE"] = os.path.join(
         project_root, "tests", ".coverage"
     )
@@ -46,3 +45,4 @@ config.environment["LD_LIBRARY_PATH"] = os.environ.get("LD_LIBRARY_PATH", "")
 config.substitutions.append(("%dump_types", f'{executable_cmd} "{tool_path}"'))
 config.substitutions.append(("%filecheck", f'"{filecheck_path}"'))
 config.substitutions.append(("%cmake", f'"{cmake_path}"'))
+config.substitutions.append(("%python", f"{executable_cmd}"))
