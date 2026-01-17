@@ -197,8 +197,9 @@ class TestUnits(unittest.TestCase):
         # Verify IndexManager handles parse exceptions.
         manager = IndexManager(self.test_dir)
         # invalid source file that doesn't exist
-        res = manager.get_types("non_existent_file.c")
+        res, hit = manager.get_types("non_existent_file.c")
         self.assertEqual(res, [])
+        self.assertFalse(hit)
 
     def test_basic_resolution(self):
         root = self.test_dir
@@ -220,6 +221,43 @@ class TestUnits(unittest.TestCase):
 
         result = resolver.resolve(args, source)
         self.assertEqual(result, (f"-I{os.path.join(root, 'include')}", "-I/abs/path"))
+
+
+class TestTranslationUnitCacheMethods(unittest.TestCase):
+    def setUp(self):
+        self.test_dir = tempfile.mkdtemp()
+        self.cache = TranslationUnitCache()
+
+    def tearDown(self):
+        shutil.rmtree(self.test_dir)
+
+    def test_clear(self):
+        source = os.path.join(self.test_dir, "test.c")
+        with open(source, "w") as f:
+            f.write("int x;")
+        sig = ("-DTEST",)
+
+        self.cache.put(source, sig, [], {})
+        self.assertIsNotNone(self.cache.get(source, sig))
+
+        self.cache.clear()
+        self.assertIsNone(self.cache.get(source, sig))
+
+    def test_remove(self):
+        source = os.path.join(self.test_dir, "test.c")
+        with open(source, "w") as f:
+            f.write("int x;")
+        sig = ("-DTEST",)
+
+        self.cache.put(source, sig, [], {})
+        self.assertIsNotNone(self.cache.get(source, sig))
+
+        # Remove existing
+        self.assertTrue(self.cache.remove(source, sig))
+        self.assertIsNone(self.cache.get(source, sig))
+
+        # Remove non-existent
+        self.assertFalse(self.cache.remove(source, sig))
 
 
 if __name__ == "__main__":

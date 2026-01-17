@@ -186,6 +186,21 @@ class TranslationUnitCache:
         )
         self._cache[(source_path, signature)] = entry
 
+    def clear(self):
+        """Clears the entire cache."""
+        self._cache.clear()
+
+    def remove(self, source_path: str, signature: Tuple[str, ...]) -> bool:
+        """
+        Removes a specific entry from the cache.
+        Returns True if the entry existed and was removed, False otherwise.
+        """
+        key = (source_path, signature)
+        if key in self._cache:
+            del self._cache[key]
+            return True
+        return False
+
 
 class IndexManager:
     """
@@ -199,25 +214,34 @@ class IndexManager:
         self.args_resolver = CompilationArgsResolver(self.project_root)
         self.db_handler = DatabaseHandler(build_dir)
 
+    def _resolve_signature(
+        self, source_file: str, extra_args: Optional[List[str]]
+    ) -> Tuple[str, ...]:
+        db_args = self.db_handler.get_compile_args(source_file)
+        full_args = (db_args or []) + (extra_args or [])
+        return self.args_resolver.resolve(full_args, source_file)
+
     def get_types(
         self,
         source_file: str,
         extra_args: Optional[List[str]] = None,
         filter_opts: Optional[Dict] = None,
-    ) -> List[TypeInfo]:
+        ignore_cache: bool = False,
+    ) -> Tuple[List[TypeInfo], bool]:
         source_file = os.path.abspath(source_file)
 
-        db_args = self.db_handler.get_compile_args(source_file)
-        full_args = (db_args or []) + (extra_args or [])
+        signature = self._resolve_signature(source_file, extra_args)
 
-        signature = self.args_resolver.resolve(full_args, source_file)
-
-        cached_entry = self.cache.get(source_file, signature)
+        cached_entry = None
+        if not ignore_cache:
+            cached_entry = self.cache.get(source_file, signature)
 
         type_infos = []
+        is_cache_hit = False
 
         if cached_entry:
             type_infos = cached_entry.type_infos
+            is_cache_hit = True
         else:
             try:
                 # Use resolved args for consistency; libclang ignores removed flags (-c, -o)
@@ -251,17 +275,34 @@ class IndexManager:
 
             except Exception as e:
                 print(f"Error parsing {source_file}: {e}", file=sys.stderr)
-                return []
+                return [], False
 
         if not filter_opts:
-            return type_infos
+            return type_infos, is_cache_hit
 
-        return TypeFilter.filter(
+        filtered = TypeFilter.filter(
             type_infos,
             filter_opts.get("scope", "main"),
             filter_opts.get("decls", "defs"),
             source_file,
         )
+        return filtered, is_cache_hit
+
+    def clear_cache(self) -> None:
+        """Clears the entire translation unit cache."""
+        self.cache.clear()
+
+    def clear_cache_for_tu(
+        self, source_file: str, extra_args: Optional[List[str]] = None
+    ) -> bool:
+        """
+        Removes a specific translation unit from the cache.
+        Requires the same source file and arguments used during parsing.
+        Returns True if the entry was found and removed.
+        """
+        source_file = os.path.abspath(source_file)
+        signature = self._resolve_signature(source_file, extra_args)
+        return self.cache.remove(source_file, signature)
 
 
 class TypeFilter:
@@ -514,7 +555,7 @@ def main():
     }
 
     try:
-        type_infos = manager.get_types(
+        type_infos, _ = manager.get_types(
             source_file=args.source_file,
             extra_args=args.clang_extra_args,
             filter_opts=filter_opts,

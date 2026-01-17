@@ -37,24 +37,24 @@ class TestIndexManager(unittest.TestCase):
     def test_caching(self):
         manager = IndexManager(project_root=self.test_dir)
 
-        # First pass - should parse
+        # First pass - should parse (Miss)
         opts = {"scope": "all", "decls": "all"}
         args = ["-I", self.test_dir]
 
-        types1 = manager.get_types(self.source_file, args, opts)
+        types1, hit1 = manager.get_types(self.source_file, args, opts)
         self.assertEqual(len(types1), 2)  # HeaderStruct, MainStruct
+        self.assertFalse(hit1)
 
         # Access cache directly to verify entry exists
         # We need to resolve the signature manually to check the key
-        signature = manager.args_resolver.resolve(args, self.source_file)
+        signature = manager._resolve_signature(self.source_file, args)
         cached_entry = manager.cache.get(self.source_file, signature)
         self.assertIsNotNone(cached_entry)
 
         # Second pass - should hit cache
-        # We can't easily mock the internal parse method currently.
-
-        types2 = manager.get_types(self.source_file, args, opts)
+        types2, hit2 = manager.get_types(self.source_file, args, opts)
         self.assertEqual(len(types2), 2)
+        self.assertTrue(hit2)
 
         # Modify header
         time.sleep(1.1)  # Ensure mtime changes
@@ -64,14 +64,66 @@ class TestIndexManager(unittest.TestCase):
         cached_entry_after_touch = manager.cache.get(self.source_file, signature)
         self.assertIsNone(cached_entry_after_touch)
 
-        # Reparse
-        types3 = manager.get_types(self.source_file, args, opts)
+        # Reparse (Miss)
+        types3, hit3 = manager.get_types(self.source_file, args, opts)
         self.assertEqual(len(types3), 2)
+        self.assertFalse(hit3)
 
         # Verify it's back in cache
         cached_entry_new = manager.cache.get(self.source_file, signature)
         self.assertIsNotNone(cached_entry_new)
         self.assertNotEqual(cached_entry, cached_entry_new)
+
+    def test_ignore_cache(self):
+        manager = IndexManager(project_root=self.test_dir)
+        args = ["-I", self.test_dir]
+
+        # First pass - miss
+        _, hit1 = manager.get_types(self.source_file, args)
+        self.assertFalse(hit1)
+
+        # Second pass - hit
+        _, hit2 = manager.get_types(self.source_file, args)
+        self.assertTrue(hit2)
+
+        # Third pass with ignore_cache - should report miss
+        _, hit3 = manager.get_types(self.source_file, args, ignore_cache=True)
+        self.assertFalse(hit3)
+
+    def test_clear_cache(self):
+        manager = IndexManager(project_root=self.test_dir)
+        args = ["-I", self.test_dir]
+
+        manager.get_types(self.source_file, args)
+        
+        # Verify cached
+        _, hit = manager.get_types(self.source_file, args)
+        self.assertTrue(hit)
+
+        # Clear
+        manager.clear_cache()
+
+        # Should be miss now
+        _, hit_after = manager.get_types(self.source_file, args)
+        self.assertFalse(hit_after)
+
+    def test_clear_cache_for_tu(self):
+        manager = IndexManager(project_root=self.test_dir)
+        args = ["-I", self.test_dir]
+
+        manager.get_types(self.source_file, args)
+        
+        # Verify cached
+        _, hit = manager.get_types(self.source_file, args)
+        self.assertTrue(hit)
+
+        # Clear specific TU
+        removed = manager.clear_cache_for_tu(self.source_file, args)
+        self.assertTrue(removed)
+
+        # Should be miss now
+        _, hit_after = manager.get_types(self.source_file, args)
+        self.assertFalse(hit_after)
 
 
 if __name__ == "__main__":
