@@ -19,16 +19,6 @@ from clang.cindex import (
     CompilationDatabaseError,
 )
 
-USER_DEFINED_KINDS = {
-    CursorKind.STRUCT_DECL: "Struct",
-    CursorKind.CLASS_DECL: "Class",
-    CursorKind.UNION_DECL: "Union",
-    CursorKind.ENUM_DECL: "Enum",
-    CursorKind.CLASS_TEMPLATE: "TemplateClass",
-}
-
-ALIAS_KINDS = {CursorKind.TYPEDEF_DECL: "Typedef", CursorKind.TYPE_ALIAS_DECL: "Using"}
-
 
 @dataclass
 class TypeInfo:
@@ -48,19 +38,11 @@ class TypeInfo:
     tu_source: str
 
     @staticmethod
-    def _get_readable_kind(cursor) -> str:
-        if cursor.kind in USER_DEFINED_KINDS:
-            return USER_DEFINED_KINDS[cursor.kind]
-        if cursor.kind in ALIAS_KINDS:
-            return ALIAS_KINDS[cursor.kind]
-        return str(cursor.kind)
-
-    @staticmethod
-    def from_cursor(cursor, category: str, tu_source: str) -> "TypeInfo":
+    def from_cursor(cursor, category: str, kind: str, tu_source: str) -> "TypeInfo":
         return TypeInfo(
             name=cursor.spelling,
             usr=cursor.get_usr(),
-            kind=TypeInfo._get_readable_kind(cursor),
+            kind=kind,
             category=category,
             is_definition=cursor.is_definition(),
             filename=cursor.location.file.name if cursor.location.file else "<unknown>",
@@ -102,24 +84,50 @@ class CacheEntry:
     dependencies: Dict[str, DependencyInfo]
 
 
-def collect_all_types(cursor, collected_types: List[TypeInfo], tu_source: str):
+class TypeCollector:
     """
-    Traverse AST and populate collected_types list with TypeInfo objects.
-    Extracts ALL named types without filtering.
+    Stateful visitor that traverses the AST to collect type information.
     """
-    # Ignore types without location
-    if cursor.location.file:
-        category = None
-        if cursor.kind in USER_DEFINED_KINDS:
-            category = "UserDefined"
-        elif cursor.kind in ALIAS_KINDS:
-            category = "Alias"
 
-        if category and cursor.spelling:
-            collected_types.append(TypeInfo.from_cursor(cursor, category, tu_source))
+    USER_DEFINED_KINDS = {
+        CursorKind.STRUCT_DECL: "Struct",
+        CursorKind.CLASS_DECL: "Class",
+        CursorKind.UNION_DECL: "Union",
+        CursorKind.ENUM_DECL: "Enum",
+        CursorKind.CLASS_TEMPLATE: "TemplateClass",
+    }
 
-    for child in cursor.get_children():
-        collect_all_types(child, collected_types, tu_source)
+    ALIAS_KINDS = {
+        CursorKind.TYPEDEF_DECL: "Typedef",
+        CursorKind.TYPE_ALIAS_DECL: "Using",
+    }
+
+    def __init__(self, tu_source: str):
+        self.tu_source = tu_source
+        self.collected_types: List[TypeInfo] = []
+
+    def _get_category_and_kind(self, cursor) -> Tuple[Optional[str], Optional[str]]:
+        if cursor.kind in self.USER_DEFINED_KINDS:
+            return "UserDefined", self.USER_DEFINED_KINDS[cursor.kind]
+        if cursor.kind in self.ALIAS_KINDS:
+            return "Alias", self.ALIAS_KINDS[cursor.kind]
+        return None, None
+
+    def collect(self, cursor):
+        """
+        Traverse AST and populate collected_types list with TypeInfo objects.
+        Extracts ALL named types without filtering.
+        """
+        if cursor.location.file:
+            category, kind = self._get_category_and_kind(cursor)
+
+            if category and kind and cursor.spelling:
+                self.collected_types.append(
+                    TypeInfo.from_cursor(cursor, category, kind, self.tu_source)
+                )
+
+        for child in cursor.get_children():
+            self.collect(child)
 
 
 class TranslationUnitCache:
@@ -282,9 +290,9 @@ class IndexManager:
                 if not tu:
                     raise Exception("TranslationUnit is None")
 
-                all_types: List[TypeInfo] = []
-                collect_all_types(tu.cursor, all_types, source_file)
-                type_infos = all_types
+                collector = TypeCollector(source_file)
+                collector.collect(tu.cursor)
+                type_infos = collector.collected_types
 
                 dependencies: Dict[str, DependencyInfo] = {}
                 for include in tu.get_includes():
