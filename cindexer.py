@@ -102,9 +102,16 @@ class TypeCollector:
         CursorKind.TYPE_ALIAS_DECL: "Using",
     }
 
-    def __init__(self, tu_source: str):
+    def __init__(
+        self,
+        tu_source: str,
+        exclude_system_headers: bool = False,
+        system_paths: Optional[List[str]] = None,
+    ):
         self.tu_source = tu_source
         self.collected_types: List[TypeInfo] = []
+        self.exclude_system_headers = exclude_system_headers
+        self.system_paths = system_paths or []
 
     def _get_category_and_kind(self, cursor) -> Tuple[Optional[str], Optional[str]]:
         if cursor.kind in self.USER_DEFINED_KINDS:
@@ -118,6 +125,17 @@ class TypeCollector:
         Traverse AST and populate collected_types list with TypeInfo objects.
         Extracts ALL named types without filtering.
         """
+        if self.exclude_system_headers:
+            # Check if in system header (libclang check)
+            if cursor.location.is_in_system_header:
+                return
+            if cursor.location.file:
+                # print(self.system_paths)
+                filename = cursor.location.file.name
+                for sys_path in self.system_paths:
+                    if filename.startswith(sys_path):
+                        return
+
         if cursor.location.file:
             category, kind = self._get_category_and_kind(cursor)
 
@@ -235,6 +253,7 @@ class IndexManager:
         extra_args: Optional[List[str]] = None,
         filter_opts: Optional[Dict] = None,
         ignore_cache: bool = False,
+        exclude_system_headers: bool = False,
     ) -> Tuple[List[TypeInfo], bool]:
         resolved_files = self.db_handler.find_matching_files(source_file)
 
@@ -252,7 +271,7 @@ class IndexManager:
 
         for f in resolved_files:
             types, hit = self._get_types_single(
-                f, extra_args, filter_opts, ignore_cache
+                f, extra_args, filter_opts, ignore_cache, exclude_system_headers
             )
             all_types.extend(types)
             if not hit:
@@ -266,10 +285,14 @@ class IndexManager:
         extra_args: Optional[List[str]] = None,
         filter_opts: Optional[Dict] = None,
         ignore_cache: bool = False,
+        exclude_system_headers: bool = False,
     ) -> Tuple[List[TypeInfo], bool]:
         source_file = os.path.abspath(source_file)
 
+        # Include exclusion flag in signature to invalidate cache on change
         signature = self._resolve_signature(source_file, extra_args)
+        if exclude_system_headers:
+            signature = signature + ("--exclude-sys",)
 
         cached_entry = None
         if not ignore_cache:
@@ -284,13 +307,21 @@ class IndexManager:
         else:
             try:
                 # Use resolved args for consistency; libclang ignores removed flags (-c, -o)
+                # Parse args might contain the extra flag we appended, remove it for parsing
                 parse_args = list(signature)
+                if exclude_system_headers:
+                    parse_args = parse_args[:-1]
 
                 tu = self.index.parse(source_file, args=parse_args)
                 if not tu:
                     raise Exception("TranslationUnit is None")
 
-                collector = TypeCollector(source_file)
+                system_paths = CompilationArgsResolver.extract_isystem_paths(tuple(parse_args))
+                collector = TypeCollector(
+                    source_file,
+                    exclude_system_headers=exclude_system_headers,
+                    system_paths=system_paths,
+                )
                 collector.collect(tu.cursor)
                 type_infos = collector.collected_types
 
@@ -484,6 +515,20 @@ class CompilationArgsResolver:
 
         return tuple(canonical)
 
+    @staticmethod
+    def extract_isystem_paths(args: Tuple[str, ...]) -> List[str]:
+        paths = []
+        skip_next = False
+        for i, arg in enumerate(args):
+            if skip_next:
+                skip_next = False
+                continue
+            if arg == "-isystem":
+                if i + 1 < len(args):
+                    paths.append(args[i + 1])
+                    skip_next = True
+        return paths
+
 
 class DatabaseHandler:
     def __init__(self, build_path=None):
@@ -642,6 +687,12 @@ def parse_arguments():
     )
 
     parser.add_argument(
+        "--exclude-system-headers",
+        action="store_true",
+        help="Exclude types from system headers (including -isystem paths).",
+    )
+
+    parser.add_argument(
         "-p",
         "--build-dir",
         help="Path to the build directory containing compile_commands.json",
@@ -678,6 +729,7 @@ def main():
             source_file=args.source_file,
             extra_args=args.clang_extra_args,
             filter_opts=filter_opts,
+            exclude_system_headers=args.exclude_system_headers,
         )
     except Exception as e:
         print(f"Error: {e}", file=sys.stderr)
