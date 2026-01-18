@@ -7,6 +7,10 @@ struct __Hidden {
     int x;
 };
 
+struct _Hidden2 {
+    int x;
+};
+
 struct Visible {
     int y;
 };
@@ -17,9 +21,11 @@ int main() {
 }
 
 // DEFAULT-NOT: Struct: __Hidden
+// DEFAULT-NOT: Struct: _Hidden2
 // DEFAULT-NOT: TemplateClass: vector
 // DEFAULT: Struct: Visible [Def] @ {{.*}}std_include.cpp
 
 // SHOW-STD-NOT: Struct: __Hidden
+// SHOW-STD-NOT: Struct: _Hidden2
 // SHOW-STD: Struct: Visible [Def] @ {{.*}}std_include.cpp
 // SHOW-STD: TemplateClass: vector

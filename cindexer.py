@@ -359,10 +359,10 @@ class TypeFilter:
     ) -> List[TypeInfo]:
         filtered = []
         for info in type_infos:
-            if info.name.startswith("__"):
+            if info.name.startswith("_"):
                 continue
 
-            if not show_std and info.usr.startswith("c:@N@std@"):
+            if not show_std and ("@N@std@" in info.usr or "N@__gnu_cxx@" in info.usr):
                 continue
 
             if scope == "main":
