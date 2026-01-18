@@ -260,5 +260,91 @@ class TestTranslationUnitCacheMethods(unittest.TestCase):
         self.assertFalse(self.cache.remove(source, sig))
 
 
+class TestDatabaseHandlerFuzzy(unittest.TestCase):
+    def setUp(self):
+        self.handler = DatabaseHandler()
+        # Mock the DB
+        self.mock_db = MagicMock()
+        self.handler.db = self.mock_db
+
+    def test_fuzzy_match_single(self):
+        # Setup DB cmds
+        cmd1 = MagicMock()
+        cmd1.filename = "/abs/path/to/src/test.cpp"
+        cmd2 = MagicMock()
+        cmd2.filename = "/abs/path/to/src/other.cpp"
+
+        self.mock_db.getAllCompileCommands.return_value = [cmd1, cmd2]
+
+        # Exact match of filename
+        matches = self.handler.find_matching_files("test.cpp")
+        self.assertEqual(matches, ["/abs/path/to/src/test.cpp"])
+
+        # Match with directory
+        matches = self.handler.find_matching_files("src/test.cpp")
+        self.assertEqual(matches, ["/abs/path/to/src/test.cpp"])
+
+    def test_fuzzy_match_multiple(self):
+        cmd1 = MagicMock()
+        cmd1.filename = "/abs/path/A/common.cpp"
+        cmd2 = MagicMock()
+        cmd2.filename = "/abs/path/B/common.cpp"
+
+        self.mock_db.getAllCompileCommands.return_value = [cmd1, cmd2]
+
+        matches = self.handler.find_matching_files("common.cpp")
+        self.assertEqual(len(matches), 2)
+        self.assertIn("/abs/path/A/common.cpp", matches)
+        self.assertIn("/abs/path/B/common.cpp", matches)
+
+    def test_fuzzy_match_suffix_boundary(self):
+        cmd1 = MagicMock()
+        cmd1.filename = "/abs/path/mytest.cpp"
+
+        self.mock_db.getAllCompileCommands.return_value = [cmd1]
+
+        # "test.cpp" should NOT match "mytest.cpp"
+        matches = self.handler.find_matching_files("test.cpp")
+        # Should fall back to "test.cpp"
+        self.assertEqual(matches, ["test.cpp"])
+
+    def test_fallback_no_db(self):
+        handler = DatabaseHandler()
+        # handler.db is None
+
+        # partial path
+        matches = handler.find_matching_files("somefile.cpp")
+        self.assertEqual(matches, ["somefile.cpp"])
+
+        # If file exists
+        with tempfile.NamedTemporaryFile(suffix=".cpp") as tf:
+            matches = handler.find_matching_files(tf.name)
+            self.assertEqual(matches, [os.path.abspath(tf.name)])
+
+    def test_absolute_path_optimization(self):
+        # Verify that getAllCompileCommands is NOT called for absolute paths
+        abs_path = "/abs/path/to/source.cpp"
+
+        # Setup getCompileCommands to return a result (simulating hit)
+        cmd = MagicMock()
+        cmd.filename = abs_path
+        self.mock_db.getCompileCommands.return_value = [cmd]
+
+        matches = self.handler.find_matching_files(abs_path)
+
+        self.assertEqual(matches, [abs_path])
+        self.mock_db.getCompileCommands.assert_called_with(abs_path)
+        self.mock_db.getAllCompileCommands.assert_not_called()
+
+        # Test fallback when absolute path not in DB
+        self.mock_db.getCompileCommands.return_value = None  # or []
+
+        matches_fallback = self.handler.find_matching_files(abs_path)
+
+        self.assertEqual(matches_fallback, [abs_path])
+        # Still should not have called getAllCompileCommands
+        self.mock_db.getAllCompileCommands.assert_not_called()
+
+
 if __name__ == "__main__":
     unittest.main()

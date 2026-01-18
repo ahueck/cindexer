@@ -4,6 +4,7 @@ import unittest
 import sys
 import os
 import time
+import unittest.mock
 
 # Load cindexer module
 project_root = os.path.dirname(
@@ -124,6 +125,52 @@ class TestIndexManager(unittest.TestCase):
         # Should be miss now
         _, hit_after = manager.get_types(self.source_file, args)
         self.assertFalse(hit_after)
+
+    def test_fuzzy_resolution_merge(self):
+        src1 = os.path.join(self.test_dir, "part_A.c")
+        src2 = os.path.join(self.test_dir, "part_B.c")
+
+        with open(src1, "w") as f:
+            f.write("struct A { int a; };")
+        with open(src2, "w") as f:
+            f.write("struct B { int b; };")
+
+        manager = IndexManager(project_root=self.test_dir)
+
+        def mock_find(partial):
+            if partial == "part":
+                return [src1, src2]
+            # Fallback for explicit paths
+            if os.path.exists(partial):
+                return [os.path.abspath(partial)]
+            return [partial]
+
+        with unittest.mock.patch.object(
+            manager.db_handler, "find_matching_files", side_effect=mock_find
+        ):
+            # 1. Query "part" -> matches both
+            types, hit = manager.get_types("part")
+            names = sorted([t.name for t in types])
+            self.assertEqual(names, ["A", "B"])
+            self.assertFalse(hit)
+
+            # 2. Query again -> should hit cache
+            types2, hit2 = manager.get_types("part")
+            self.assertTrue(hit2)
+            self.assertEqual(len(types2), 2)
+
+            # 3. Clear cache for ONE file
+            # We pass absolute path src1. mock_find returns [src1].
+            manager.clear_cache_for_tu(src1)
+
+            # 4. Query "part" again -> should be partial hit -> overall False
+            types3, hit3 = manager.get_types("part")
+            self.assertFalse(hit3)
+            self.assertEqual(len(types3), 2)
+
+            # 5. Query again -> Hit
+            types4, hit4 = manager.get_types("part")
+            self.assertTrue(hit4)
 
 
 if __name__ == "__main__":

@@ -228,6 +228,37 @@ class IndexManager:
         filter_opts: Optional[Dict] = None,
         ignore_cache: bool = False,
     ) -> Tuple[List[TypeInfo], bool]:
+        resolved_files = self.db_handler.find_matching_files(source_file)
+
+        if len(resolved_files) > 1:
+            print(
+                f"Ambiguous path '{source_file}' matched multiple files:",
+                file=sys.stderr,
+            )
+            for f in resolved_files:
+                print(f"  - {f}", file=sys.stderr)
+            print(f"Processing all matches...", file=sys.stderr)
+
+        all_types = []
+        is_cache_hit = True
+
+        for f in resolved_files:
+            types, hit = self._get_types_single(
+                f, extra_args, filter_opts, ignore_cache
+            )
+            all_types.extend(types)
+            if not hit:
+                is_cache_hit = False
+
+        return all_types, is_cache_hit
+
+    def _get_types_single(
+        self,
+        source_file: str,
+        extra_args: Optional[List[str]] = None,
+        filter_opts: Optional[Dict] = None,
+        ignore_cache: bool = False,
+    ) -> Tuple[List[TypeInfo], bool]:
         source_file = os.path.abspath(source_file)
 
         signature = self._resolve_signature(source_file, extra_args)
@@ -300,9 +331,16 @@ class IndexManager:
         Requires the same source file and arguments used during parsing.
         Returns True if the entry was found and removed.
         """
-        source_file = os.path.abspath(source_file)
-        signature = self._resolve_signature(source_file, extra_args)
-        return self.cache.remove(source_file, signature)
+        resolved_files = self.db_handler.find_matching_files(source_file)
+        any_removed = False
+
+        for f in resolved_files:
+            abs_source = os.path.abspath(f)
+            signature = self._resolve_signature(abs_source, extra_args)
+            if self.cache.remove(abs_source, signature):
+                any_removed = True
+
+        return any_removed
 
 
 class TypeFilter:
@@ -483,6 +521,61 @@ class DatabaseHandler:
         raw_args = list(cmds[0].arguments)
 
         return raw_args[1:]
+
+    def find_matching_files(self, partial_path: str) -> List[str]:
+        """
+        Resolves a partial path to a list of absolute paths from the compilation database.
+        Returns unique matching absolute paths.
+        """
+        if not self.db:
+            if os.path.exists(partial_path):
+                return [os.path.abspath(partial_path)]
+            return [partial_path]
+
+        # Optimization: If path is absolute, try direct lookup first
+        if os.path.isabs(partial_path):
+            try:
+                cmds = self.db.getCompileCommands(partial_path)
+                if cmds and len(cmds) > 0:
+                    return [partial_path]
+            except Exception:
+                pass
+
+            # If absolute path not found in DB, return it as is (fallback behavior)
+            return [partial_path]
+
+        matches = set()
+        partial_path_norm = partial_path.strip()
+
+        try:
+            all_cmds = self.db.getAllCompileCommands()
+        except Exception:
+            # Fallback if getAllCompileCommands fails or is not available
+            all_cmds = []
+
+        if not all_cmds:
+            if os.path.exists(partial_path):
+                return [os.path.abspath(partial_path)]
+            return [partial_path]
+
+        for cmd in all_cmds:
+            file_path = cmd.filename
+            abs_file_path = os.path.abspath(file_path)
+
+            if abs_file_path.endswith(partial_path_norm):
+                if len(abs_file_path) == len(partial_path_norm):
+                    matches.add(abs_file_path)
+                elif abs_file_path[-(len(partial_path_norm) + 1)] == os.path.sep:
+                    matches.add(abs_file_path)
+
+        results = sorted(list(matches))
+
+        if not results:
+            if os.path.exists(partial_path):
+                return [os.path.abspath(partial_path)]
+            return [partial_path]
+
+        return results
 
 
 def parse_arguments():
