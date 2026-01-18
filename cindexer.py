@@ -254,6 +254,7 @@ class IndexManager:
         filter_opts: Optional[Dict] = None,
         ignore_cache: bool = False,
         exclude_system_headers: bool = False,
+        exclude_isystem: bool = False,
     ) -> Tuple[List[TypeInfo], bool]:
         resolved_files = self.db_handler.find_matching_files(source_file)
 
@@ -271,7 +272,12 @@ class IndexManager:
 
         for f in resolved_files:
             types, hit = self._get_types_single(
-                f, extra_args, filter_opts, ignore_cache, exclude_system_headers
+                f,
+                extra_args,
+                filter_opts,
+                ignore_cache,
+                exclude_system_headers,
+                exclude_isystem,
             )
             all_types.extend(types)
             if not hit:
@@ -286,6 +292,7 @@ class IndexManager:
         filter_opts: Optional[Dict] = None,
         ignore_cache: bool = False,
         exclude_system_headers: bool = False,
+        exclude_isystem: bool = False,
     ) -> Tuple[List[TypeInfo], bool]:
         source_file = os.path.abspath(source_file)
 
@@ -293,6 +300,8 @@ class IndexManager:
         signature = self._resolve_signature(source_file, extra_args)
         if exclude_system_headers:
             signature = signature + ("--exclude-sys",)
+        if exclude_isystem:
+            signature = signature + ("--exclude-isys",)
 
         cached_entry = None
         if not ignore_cache:
@@ -309,16 +318,21 @@ class IndexManager:
                 # Use resolved args for consistency; libclang ignores removed flags (-c, -o)
                 # Parse args might contain the extra flag we appended, remove it for parsing
                 parse_args = list(signature)
+                if exclude_isystem:
+                    parse_args.pop()
                 if exclude_system_headers:
-                    parse_args = parse_args[:-1]
+                    parse_args.pop()
 
                 tu = self.index.parse(source_file, args=parse_args)
                 if not tu:
                     raise Exception("TranslationUnit is None")
 
-                system_paths = CompilationArgsResolver.extract_isystem_paths(
-                    tuple(parse_args)
-                )
+                system_paths = []
+                if exclude_isystem:
+                    system_paths = CompilationArgsResolver.extract_isystem_paths(
+                        tuple(parse_args)
+                    )
+
                 collector = TypeCollector(
                     source_file,
                     exclude_system_headers=exclude_system_headers,
@@ -357,7 +371,6 @@ class IndexManager:
             filter_opts.get("scope", "main"),
             filter_opts.get("decls", "defs"),
             source_file,
-            show_std=filter_opts.get("show_std", False),
         )
         return filtered, is_cache_hit
 
@@ -396,14 +409,10 @@ class TypeFilter:
         scope: str,
         decls: str,
         main_file: str,
-        show_std: bool = False,
     ) -> List[TypeInfo]:
         filtered = []
         for info in type_infos:
             if info.name.startswith("_"):
-                continue
-
-            if not show_std and ("@N@std@" in info.usr or "N@__gnu_cxx@" in info.usr):
                 continue
 
             if scope == "main":
@@ -657,9 +666,9 @@ def parse_arguments():
 
     parser.add_argument(
         "--scope",
-        choices=["main", "all", "non-sys"],
+        choices=["main", "all", "non-sys", "non-std"],
         default="main",
-        help="Scope: 'main' (source file only), 'all' (includes all headers), or 'non-sys' (all non-system headers).",
+        help="Scope: 'main' (source file only), 'all' (includes all headers), 'non-sys' (all non-system headers), or 'non-std' (includes -isystem headers, but no std headers).",
     )
 
     parser.add_argument(
@@ -674,12 +683,6 @@ def parse_arguments():
         choices=["text", "json"],
         default="json",
         help="Output format. Default: json",
-    )
-
-    parser.add_argument(
-        "--show-std",
-        action="store_true",
-        help="Show standard library types (std:: namespace).",
     )
 
     parser.add_argument(
@@ -716,25 +719,33 @@ def main():
 
     # Map scope argument to internal exclusion logic and filter logic
     exclude_system_headers = False
+    exclude_isystem = False
     filter_scope = "main"
 
     if args.scope == "main":
         # Only main file. We can exclude system headers traversal optimization.
         exclude_system_headers = True
+        exclude_isystem = True
         filter_scope = "main"
     elif args.scope == "all":
         # Everything.
         exclude_system_headers = False
+        exclude_isystem = False
         filter_scope = "all"
     elif args.scope == "non-sys":
-        # Everything except system headers.
+        # Everything except system headers (libclang system + -isystem).
         exclude_system_headers = True
+        exclude_isystem = True
+        filter_scope = "all"
+    elif args.scope == "non-std":
+        # Everything except standard headers (libclang system), but includes -isystem.
+        exclude_system_headers = True
+        exclude_isystem = False
         filter_scope = "all"
 
     filter_opts = {
         "scope": filter_scope,
         "decls": args.decls,
-        "show_std": args.show_std,
     }
 
     try:
@@ -743,6 +754,7 @@ def main():
             extra_args=args.clang_extra_args,
             filter_opts=filter_opts,
             exclude_system_headers=exclude_system_headers,
+            exclude_isystem=exclude_isystem,
         )
     except Exception as e:
         print(f"Error: {e}", file=sys.stderr)
