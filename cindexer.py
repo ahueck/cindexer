@@ -316,6 +316,7 @@ class IndexManager:
             filter_opts.get("scope", "main"),
             filter_opts.get("decls", "defs"),
             source_file,
+            show_std=filter_opts.get("show_std", False),
         )
         return filtered, is_cache_hit
 
@@ -350,10 +351,20 @@ class TypeFilter:
 
     @staticmethod
     def filter(
-        type_infos: List[TypeInfo], scope: str, decls: str, main_file: str
+        type_infos: List[TypeInfo],
+        scope: str,
+        decls: str,
+        main_file: str,
+        show_std: bool = False,
     ) -> List[TypeInfo]:
         filtered = []
         for info in type_infos:
+            if info.name.startswith("__"):
+                continue
+
+            if not show_std and info.usr.startswith("c:@N@std@"):
+                continue
+
             if scope == "main":
                 if info.filename != main_file:
                     continue
@@ -611,6 +622,12 @@ def parse_arguments():
     )
 
     parser.add_argument(
+        "--show-std",
+        action="store_true",
+        help="Show standard library types (std:: namespace).",
+    )
+
+    parser.add_argument(
         "--location",
         action="store_true",
         help="Include file path and line number in output.",
@@ -645,6 +662,7 @@ def main():
     filter_opts = {
         "scope": args.scope,
         "decls": args.decls,
+        "show_std": args.show_std,
     }
 
     try:
