@@ -316,7 +316,9 @@ class IndexManager:
                 if not tu:
                     raise Exception("TranslationUnit is None")
 
-                system_paths = CompilationArgsResolver.extract_isystem_paths(tuple(parse_args))
+                system_paths = CompilationArgsResolver.extract_isystem_paths(
+                    tuple(parse_args)
+                )
                 collector = TypeCollector(
                     source_file,
                     exclude_system_headers=exclude_system_headers,
@@ -655,9 +657,9 @@ def parse_arguments():
 
     parser.add_argument(
         "--scope",
-        choices=["main", "all"],
+        choices=["main", "all", "non-sys"],
         default="main",
-        help="Scope: 'main' (source file only) or 'all' (includes headers).",
+        help="Scope: 'main' (source file only), 'all' (includes all headers), or 'non-sys' (all non-system headers).",
     )
 
     parser.add_argument(
@@ -687,12 +689,6 @@ def parse_arguments():
     )
 
     parser.add_argument(
-        "--exclude-system-headers",
-        action="store_true",
-        help="Exclude types from system headers (including -isystem paths).",
-    )
-
-    parser.add_argument(
         "-p",
         "--build-dir",
         help="Path to the build directory containing compile_commands.json",
@@ -718,8 +714,25 @@ def main():
 
     manager = IndexManager(project_root=project_root, build_dir=args.build_dir)
 
+    # Map scope argument to internal exclusion logic and filter logic
+    exclude_system_headers = False
+    filter_scope = "main"
+
+    if args.scope == "main":
+        # Only main file. We can exclude system headers traversal optimization.
+        exclude_system_headers = True
+        filter_scope = "main"
+    elif args.scope == "all":
+        # Everything.
+        exclude_system_headers = False
+        filter_scope = "all"
+    elif args.scope == "non-sys":
+        # Everything except system headers.
+        exclude_system_headers = True
+        filter_scope = "all"
+
     filter_opts = {
-        "scope": args.scope,
+        "scope": filter_scope,
         "decls": args.decls,
         "show_std": args.show_std,
     }
@@ -729,7 +742,7 @@ def main():
             source_file=args.source_file,
             extra_args=args.clang_extra_args,
             filter_opts=filter_opts,
-            exclude_system_headers=args.exclude_system_headers,
+            exclude_system_headers=exclude_system_headers,
         )
     except Exception as e:
         print(f"Error: {e}", file=sys.stderr)
