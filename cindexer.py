@@ -316,12 +316,9 @@ class IndexManager:
         else:
             try:
                 # Use resolved args for consistency; libclang ignores removed flags (-c, -o)
-                # Parse args might contain the extra flag we appended, remove it for parsing
-                parse_args = list(signature)
-                if exclude_isystem:
-                    parse_args.pop()
-                if exclude_system_headers:
-                    parse_args.pop()
+                # Filter out internal tracking flags from the signature before passing to libclang
+                internal_flags = {"--exclude-sys", "--exclude-isys"}
+                parse_args = [arg for arg in signature if arg not in internal_flags]
 
                 tu = self.index.parse(source_file, args=parse_args)
                 if not tu:
