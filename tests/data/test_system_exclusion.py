@@ -100,6 +100,38 @@ class TestSystemHeaderExclusion(unittest.TestCase):
 
         self.assertEqual(len(collector.collected_types), 0)
 
+    def test_collector_accurate_path_matching(self):
+        # Child in a directory that starts with the same prefix as a system path
+        # but is not actually in that directory.
+        # e.g. sys_path = "/usr/include", filename = "/usr/include_extra/header.h"
+
+        sys_path = "/usr/include"
+        overlap_file = "/usr/include_extra/header.h"
+
+        mock_tu_cursor = MagicMock()
+        mock_tu_cursor.location.is_in_system_header = False
+        mock_tu_cursor.location.file.name = "/src/main.c"
+        mock_tu_cursor.kind = "TRANSLATION_UNIT"
+
+        overlap_child = MagicMock()
+        overlap_child.location.is_in_system_header = False
+        overlap_child.location.file.name = overlap_file
+        overlap_child.kind = cindex_pass.CursorKind.STRUCT_DECL
+        overlap_child.spelling = "OverlapStruct"
+
+        mock_tu_cursor.get_children.return_value = [overlap_child]
+        overlap_child.get_children.return_value = []
+
+        # Test WITH exclusion of /usr/include
+        collector = TypeCollector(
+            "/src/main.c", exclude_system_headers=True, system_paths=[sys_path]
+        )
+        collector.collect(mock_tu_cursor)
+
+        # OverlapStruct should STILL be collected because /usr/include_extra is not /usr/include
+        names = [t.name for t in collector.collected_types]
+        self.assertIn("OverlapStruct", names)
+
 
 if __name__ == "__main__":
     unittest.main()

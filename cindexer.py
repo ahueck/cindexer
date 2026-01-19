@@ -130,10 +130,9 @@ class TypeCollector:
             if cursor.location.is_in_system_header:
                 return
             if cursor.location.file:
-                # print(self.system_paths)
                 filename = cursor.location.file.name
                 for sys_path in self.system_paths:
-                    if filename.startswith(sys_path):
+                    if filename == sys_path or filename.startswith(sys_path + os.sep):
                         return
 
         if cursor.location.file:
