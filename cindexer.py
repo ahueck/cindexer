@@ -19,16 +19,6 @@ from clang.cindex import (
     CompilationDatabaseError,
 )
 
-USER_DEFINED_KINDS = {
-    CursorKind.STRUCT_DECL: "Struct",
-    CursorKind.CLASS_DECL: "Class",
-    CursorKind.UNION_DECL: "Union",
-    CursorKind.ENUM_DECL: "Enum",
-    CursorKind.CLASS_TEMPLATE: "TemplateClass",
-}
-
-ALIAS_KINDS = {CursorKind.TYPEDEF_DECL: "Typedef", CursorKind.TYPE_ALIAS_DECL: "Using"}
-
 
 @dataclass
 class TypeInfo:
@@ -48,19 +38,11 @@ class TypeInfo:
     tu_source: str
 
     @staticmethod
-    def _get_readable_kind(cursor) -> str:
-        if cursor.kind in USER_DEFINED_KINDS:
-            return USER_DEFINED_KINDS[cursor.kind]
-        if cursor.kind in ALIAS_KINDS:
-            return ALIAS_KINDS[cursor.kind]
-        return str(cursor.kind)
-
-    @staticmethod
-    def from_cursor(cursor, category: str, tu_source: str) -> "TypeInfo":
+    def from_cursor(cursor, category: str, kind: str, tu_source: str) -> "TypeInfo":
         return TypeInfo(
             name=cursor.spelling,
             usr=cursor.get_usr(),
-            kind=TypeInfo._get_readable_kind(cursor),
+            kind=kind,
             category=category,
             is_definition=cursor.is_definition(),
             filename=cursor.location.file.name if cursor.location.file else "<unknown>",
@@ -102,24 +84,67 @@ class CacheEntry:
     dependencies: Dict[str, DependencyInfo]
 
 
-def collect_all_types(cursor, collected_types: List[TypeInfo], tu_source: str):
+class TypeCollector:
     """
-    Traverse AST and populate collected_types list with TypeInfo objects.
-    Extracts ALL named types without filtering.
+    Stateful visitor that traverses the AST to collect type information.
     """
-    # Ignore types without location
-    if cursor.location.file:
-        category = None
-        if cursor.kind in USER_DEFINED_KINDS:
-            category = "UserDefined"
-        elif cursor.kind in ALIAS_KINDS:
-            category = "Alias"
 
-        if category and cursor.spelling:
-            collected_types.append(TypeInfo.from_cursor(cursor, category, tu_source))
+    USER_DEFINED_KINDS = {
+        CursorKind.STRUCT_DECL: "Struct",
+        CursorKind.CLASS_DECL: "Class",
+        CursorKind.UNION_DECL: "Union",
+        CursorKind.ENUM_DECL: "Enum",
+        CursorKind.CLASS_TEMPLATE: "TemplateClass",
+    }
 
-    for child in cursor.get_children():
-        collect_all_types(child, collected_types, tu_source)
+    ALIAS_KINDS = {
+        CursorKind.TYPEDEF_DECL: "Typedef",
+        CursorKind.TYPE_ALIAS_DECL: "Using",
+    }
+
+    def __init__(
+        self,
+        tu_source: str,
+        exclude_system_headers: bool = False,
+        system_paths: Optional[List[str]] = None,
+    ):
+        self.tu_source = tu_source
+        self.collected_types: List[TypeInfo] = []
+        self.exclude_system_headers = exclude_system_headers
+        self.system_paths = system_paths or []
+
+    def _get_category_and_kind(self, cursor) -> Tuple[Optional[str], Optional[str]]:
+        if cursor.kind in self.USER_DEFINED_KINDS:
+            return "UserDefined", self.USER_DEFINED_KINDS[cursor.kind]
+        if cursor.kind in self.ALIAS_KINDS:
+            return "Alias", self.ALIAS_KINDS[cursor.kind]
+        return None, None
+
+    def collect(self, cursor):
+        """
+        Traverse AST and populate collected_types list with TypeInfo objects.
+        Extracts ALL named types without filtering.
+        """
+        if self.exclude_system_headers:
+            # Check if in system header (libclang check)
+            if cursor.location.is_in_system_header:
+                return
+            if cursor.location.file:
+                filename = cursor.location.file.name
+                for sys_path in self.system_paths:
+                    if filename == sys_path or filename.startswith(sys_path + os.sep):
+                        return
+
+        if cursor.location.file:
+            category, kind = self._get_category_and_kind(cursor)
+
+            if category and kind and cursor.spelling:
+                self.collected_types.append(
+                    TypeInfo.from_cursor(cursor, category, kind, self.tu_source)
+                )
+
+        for child in cursor.get_children():
+            self.collect(child)
 
 
 class TranslationUnitCache:
@@ -227,6 +252,8 @@ class IndexManager:
         extra_args: Optional[List[str]] = None,
         filter_opts: Optional[Dict] = None,
         ignore_cache: bool = False,
+        exclude_system_headers: bool = False,
+        exclude_isystem: bool = False,
     ) -> Tuple[List[TypeInfo], bool]:
         resolved_files = self.db_handler.find_matching_files(source_file)
 
@@ -244,7 +271,12 @@ class IndexManager:
 
         for f in resolved_files:
             types, hit = self._get_types_single(
-                f, extra_args, filter_opts, ignore_cache
+                f,
+                extra_args,
+                filter_opts,
+                ignore_cache,
+                exclude_system_headers,
+                exclude_isystem,
             )
             all_types.extend(types)
             if not hit:
@@ -258,10 +290,17 @@ class IndexManager:
         extra_args: Optional[List[str]] = None,
         filter_opts: Optional[Dict] = None,
         ignore_cache: bool = False,
+        exclude_system_headers: bool = False,
+        exclude_isystem: bool = False,
     ) -> Tuple[List[TypeInfo], bool]:
         source_file = os.path.abspath(source_file)
 
+        # Include exclusion flag in signature to invalidate cache on change
         signature = self._resolve_signature(source_file, extra_args)
+        if exclude_system_headers:
+            signature = signature + ("--exclude-sys",)
+        if exclude_isystem:
+            signature = signature + ("--exclude-isys",)
 
         cached_entry = None
         if not ignore_cache:
@@ -276,15 +315,27 @@ class IndexManager:
         else:
             try:
                 # Use resolved args for consistency; libclang ignores removed flags (-c, -o)
-                parse_args = list(signature)
+                # Filter out internal tracking flags from the signature before passing to libclang
+                internal_flags = {"--exclude-sys", "--exclude-isys"}
+                parse_args = [arg for arg in signature if arg not in internal_flags]
 
                 tu = self.index.parse(source_file, args=parse_args)
                 if not tu:
                     raise Exception("TranslationUnit is None")
 
-                all_types: List[TypeInfo] = []
-                collect_all_types(tu.cursor, all_types, source_file)
-                type_infos = all_types
+                system_paths = []
+                if exclude_isystem:
+                    system_paths = CompilationArgsResolver.extract_isystem_paths(
+                        tuple(parse_args)
+                    )
+
+                collector = TypeCollector(
+                    source_file,
+                    exclude_system_headers=exclude_system_headers,
+                    system_paths=system_paths,
+                )
+                collector.collect(tu.cursor)
+                type_infos = collector.collected_types
 
                 dependencies: Dict[str, DependencyInfo] = {}
                 for include in tu.get_includes():
@@ -350,10 +401,16 @@ class TypeFilter:
 
     @staticmethod
     def filter(
-        type_infos: List[TypeInfo], scope: str, decls: str, main_file: str
+        type_infos: List[TypeInfo],
+        scope: str,
+        decls: str,
+        main_file: str,
     ) -> List[TypeInfo]:
         filtered = []
         for info in type_infos:
+            if info.name.startswith("_"):
+                continue
+
             if scope == "main":
                 if info.filename != main_file:
                     continue
@@ -464,6 +521,20 @@ class CompilationArgsResolver:
             canonical.append(arg)
 
         return tuple(canonical)
+
+    @staticmethod
+    def extract_isystem_paths(args: Tuple[str, ...]) -> List[str]:
+        paths = []
+        skip_next = False
+        for i, arg in enumerate(args):
+            if skip_next:
+                skip_next = False
+                continue
+            if arg == "-isystem":
+                if i + 1 < len(args):
+                    paths.append(args[i + 1])
+                    skip_next = True
+        return paths
 
 
 class DatabaseHandler:
@@ -591,9 +662,9 @@ def parse_arguments():
 
     parser.add_argument(
         "--scope",
-        choices=["main", "all"],
+        choices=["main", "all", "non-sys", "non-std"],
         default="main",
-        help="Scope: 'main' (source file only) or 'all' (includes headers).",
+        help="Scope: 'main' (source file only), 'all' (includes all headers), 'non-sys' (all non-system headers), or 'non-std' (includes -isystem headers, but no std headers).",
     )
 
     parser.add_argument(
@@ -642,8 +713,34 @@ def main():
 
     manager = IndexManager(project_root=project_root, build_dir=args.build_dir)
 
+    # Map scope argument to internal exclusion logic and filter logic
+    exclude_system_headers = False
+    exclude_isystem = False
+    filter_scope = "main"
+
+    if args.scope == "main":
+        # Only main file. We can exclude system headers traversal optimization.
+        exclude_system_headers = True
+        exclude_isystem = True
+        filter_scope = "main"
+    elif args.scope == "all":
+        # Everything.
+        exclude_system_headers = False
+        exclude_isystem = False
+        filter_scope = "all"
+    elif args.scope == "non-sys":
+        # Everything except system headers (libclang system + -isystem).
+        exclude_system_headers = True
+        exclude_isystem = True
+        filter_scope = "all"
+    elif args.scope == "non-std":
+        # Everything except standard headers (libclang system), but includes -isystem.
+        exclude_system_headers = True
+        exclude_isystem = False
+        filter_scope = "all"
+
     filter_opts = {
-        "scope": args.scope,
+        "scope": filter_scope,
         "decls": args.decls,
     }
 
@@ -652,6 +749,8 @@ def main():
             source_file=args.source_file,
             extra_args=args.clang_extra_args,
             filter_opts=filter_opts,
+            exclude_system_headers=exclude_system_headers,
+            exclude_isystem=exclude_isystem,
         )
     except Exception as e:
         print(f"Error: {e}", file=sys.stderr)
