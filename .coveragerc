@@ -1,8 +1,10 @@
 [run]
 branch = True
 parallel = True
-include = cindexer.py
+source = 
+    cindexer
 
 omit = 
     */tests/*
     */site-packages/*
+    .venv/*

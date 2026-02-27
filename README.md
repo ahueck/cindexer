@@ -24,7 +24,7 @@ export LD_LIBRARY_PATH=/usr/lib/llvm-21/lib:$LD_LIBRARY_PATH
 Dump types defined in `main.cpp` to stdout:
 
 ```bash
-python3 cindexer.py --user-def main.cpp
+python3 -m cindexer --user-def main.cpp
 ```
 
 ### Options
@@ -42,19 +42,19 @@ python3 cindexer.py --user-def main.cpp
 **JSON Output:**
 
 ```bash
-python3 cindexer.py --user-def --format=json source.cpp
+python3 -m cindexer --user-def --format=json source.cpp
 ```
 
 **Include Forward Declarations:**
 
 ```bash
-python3 cindexer.py --user-def --decls=all source.cpp
+python3 -m cindexer --user-def --decls=all source.cpp
 ```
 
 **Pass Compiler Flags:**
 
 ```bash
-python3 cindexer.py --user-def source.cpp -- -I/usr/local/include -std=c++17
+python3 -m cindexer --user-def source.cpp -- -I/usr/local/include -std=c++17
 ```
 
 ## Testing

@@ -11,7 +11,6 @@ config.excludes = ["cmake_project", "lit.cfg.py"]
 config.test_format = lit.formats.ShTest(True)
 
 project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-tool_path = os.path.join(project_root, "cindexer.py")
 python_exec = sys.executable
 
 
@@ -39,10 +38,16 @@ if use_coverage:
 else:
     executable_cmd = python_exec
 
-config.environment["PYTHONPATH"] = os.environ.get("PYTHONPATH", "")
+pythonpath = os.environ.get("PYTHONPATH", "")
+if pythonpath:
+    pythonpath = project_root + os.path.pathsep + pythonpath
+else:
+    pythonpath = project_root
+
+config.environment["PYTHONPATH"] = pythonpath
 config.environment["LD_LIBRARY_PATH"] = os.environ.get("LD_LIBRARY_PATH", "")
 
-config.substitutions.append(("%dump_types", f'{executable_cmd} "{tool_path}"'))
+config.substitutions.append(("%dump_types", f"{executable_cmd} -m cindexer"))
 config.substitutions.append(("%filecheck", f'"{filecheck_path}"'))
 config.substitutions.append(("%cmake", f'"{cmake_path}"'))
 config.substitutions.append(("%python", f"{executable_cmd}"))
