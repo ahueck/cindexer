@@ -1,0 +1,34 @@
+{
+    "name": "cindexer-vscode-extension",
+    "displayName": "CIndexer VS Code Extension",
+    "version": "0.0.1",
+    "publisher": "cindexer",
+    "engines": {
+        "vscode": "^1.85.0"
+    },
+    "categories": [
+        "Other"
+    ],
+    "activationEvents": [
+        "onStartupFinished"
+    ],
+    "main": "./dist/extension.js",
+    "contributes": {},
+    "scripts": {
+        "vscode:prepublish": "npm run compile",
+        "compile": "tsc -p ./",
+        "watch": "tsc -watch -p ./",
+        "pretest": "npm run compile && npm run lint",
+        "lint": "eslint src --ext ts",
+        "test": "node ./out/test/runTest.js"
+    },
+    "devDependencies": {
+        "@types/vscode": "^1.90.0",
+        "@types/node": "20.x",
+        "@typescript-eslint/eslint-plugin": "^7.13.0",
+        "@typescript-eslint/parser": "^7.13.0",
+        "eslint": "^8.57.0",
+        "typescript": "^5.4.5",
+        "@vscode/test-electron": "^2.4.0"
+    }
+}
