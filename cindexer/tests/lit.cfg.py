@@ -10,7 +10,7 @@ config.suffixes = [".c", ".cpp", ".sh", ".py"]
 config.excludes = ["cmake_project", "lit.cfg.py"]
 config.test_format = lit.formats.ShTest(True)
 
-project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 python_exec = sys.executable
 
 
@@ -33,7 +33,7 @@ if use_coverage:
     executable_cmd = f"{python_exec} -m coverage run --rcfile={rc_file} -p"
     config.environment["COVERAGE_PROCESS_START"] = rc_file
     config.environment["COVERAGE_FILE"] = os.path.join(
-        project_root, "tests", ".coverage"
+        project_root, "cindexer", "tests", ".coverage"
     )
 else:
     executable_cmd = python_exec

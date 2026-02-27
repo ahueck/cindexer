@@ -63,16 +63,17 @@ python3 cindexer_python_ipc/tests/query_state.py
 ```
 
 ### Automated Tests
-- **Core Engine:** `lit -v tests/` (Requires `lit` and `FileCheck`)
-- **IPC Library:** `python3 -m unittest cindexer_python_ipc/tests/test_ipc.py`
+- **Core Engine:** `lit -v cindexer/tests/` (Requires `lit` and `FileCheck`)
+- **IPC Library:** `PYTHONPATH=. python3 -m unittest cindexer_python_ipc.tests.test_ipc`
 
-### Code Coverage (Core Engine)
-To run tests with coverage reporting:
-
+### Code Coverage
+To run tests with coverage reporting for both packages:
 ```bash
 export CINDEXER_USE_COVERAGE=1
-lit -j 1 -v tests/
-python3 -m coverage combine tests/
+lit -j 1 -v cindexer/tests/
+PYTHONPATH=. python3 -m coverage run --rcfile=.coveragerc -p -m unittest cindexer_python_ipc.tests.test_ipc
+python3 -m coverage combine cindexer/tests/ .
 python3 -m coverage report -m
 ```
+
 Note: `-j 1` is recommended for `lit` to avoid race conditions when writing coverage data.
