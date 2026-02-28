@@ -9,7 +9,9 @@ import shutil
 from unittest.mock import MagicMock, patch
 
 # Load cindexer module
-project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
+project_root = os.path.dirname(
+    os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+)
 sys.path.insert(0, project_root)
 import cindexer as cindex_pass
 
@@ -161,8 +163,12 @@ class TestUnits(unittest.TestCase):
     def test_type_filter_scope(self):
         # Cover 'if scope == "main": if info.filename != main_file: continue'
         infos = [
-            TypeInfo("A", "c:A", "Struct", "UserDefined", True, "main.c", 1, 1, "main.c"),
-            TypeInfo("B", "c:B", "Struct", "UserDefined", True, "other.h", 1, 1, "main.c"),
+            TypeInfo(
+                "A", "c:A", "Struct", "UserDefined", True, "main.c", 1, 1, "main.c"
+            ),
+            TypeInfo(
+                "B", "c:B", "Struct", "UserDefined", True, "other.h", 1, 1, "main.c"
+            ),
         ]
 
         filtered = TypeFilter.filter(infos, "main", "all", "main.c")
@@ -172,8 +178,12 @@ class TestUnits(unittest.TestCase):
     def test_type_filter_decls(self):
         # Cover 'if decls == "defs": if not info.is_definition: continue'
         infos = [
-            TypeInfo("A", "c:A", "Struct", "UserDefined", True, "main.c", 1, 1, "main.c"),
-            TypeInfo("B", "c:B", "Struct", "UserDefined", False, "main.c", 1, 1, "main.c"),
+            TypeInfo(
+                "A", "c:A", "Struct", "UserDefined", True, "main.c", 1, 1, "main.c"
+            ),
+            TypeInfo(
+                "B", "c:B", "Struct", "UserDefined", False, "main.c", 1, 1, "main.c"
+            ),
         ]
 
         filtered = TypeFilter.filter(infos, "main", "defs", "main.c")

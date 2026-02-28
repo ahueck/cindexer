@@ -7,7 +7,9 @@ import time
 import unittest.mock
 
 # Load cindexer module
-project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
+project_root = os.path.dirname(
+    os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+)
 sys.path.insert(0, project_root)
 from cindexer import IndexManager
 
@@ -15,7 +17,9 @@ from cindexer import IndexManager
 class TestIndexManager(unittest.TestCase):
     def setUp(self):
         # Create a temp source file
-        self.test_dir = os.path.join(project_root, "cindexer", "tests", "data", "manager_test_tmp")
+        self.test_dir = os.path.join(
+            project_root, "cindexer", "tests", "data", "manager_test_tmp"
+        )
         os.makedirs(self.test_dir, exist_ok=True)
         self.source_file = os.path.join(self.test_dir, "test.c")
         self.header_file = os.path.join(self.test_dir, "header.h")
@@ -143,7 +147,9 @@ class TestIndexManager(unittest.TestCase):
                 return [os.path.abspath(partial)]
             return [partial]
 
-        with unittest.mock.patch.object(manager.db_handler, "find_matching_files", side_effect=mock_find):
+        with unittest.mock.patch.object(
+            manager.db_handler, "find_matching_files", side_effect=mock_find
+        ):
             # 1. Query "part" -> matches both
             types, hit = manager.get_types("part")
             names = sorted([t.name for t in types])

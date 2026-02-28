@@ -8,7 +8,9 @@ import shutil
 from unittest.mock import MagicMock, patch
 
 # Load cindexer module
-project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
+project_root = os.path.dirname(
+    os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+)
 sys.path.insert(0, project_root)
 import cindexer as cindex_pass
 
@@ -60,7 +62,9 @@ class TestSystemHeaderExclusion(unittest.TestCase):
         user_child.get_children.return_value = []
 
         # Test WITH exclusion
-        collector = TypeCollector("/src/main.c", exclude_system_headers=True, system_paths=["/sys/inc"])
+        collector = TypeCollector(
+            "/src/main.c", exclude_system_headers=True, system_paths=["/sys/inc"]
+        )
         collector.collect(mock_tu_cursor)
 
         # Should only find UserStruct
@@ -69,7 +73,9 @@ class TestSystemHeaderExclusion(unittest.TestCase):
         self.assertNotIn("SysStruct", names)
 
         # Test WITHOUT exclusion
-        collector_no = TypeCollector("/src/main.c", exclude_system_headers=False, system_paths=["/sys/inc"])
+        collector_no = TypeCollector(
+            "/src/main.c", exclude_system_headers=False, system_paths=["/sys/inc"]
+        )
         collector_no.collect(mock_tu_cursor)
 
         names_no = [t.name for t in collector_no.collected_types]
@@ -117,7 +123,9 @@ class TestSystemHeaderExclusion(unittest.TestCase):
         overlap_child.get_children.return_value = []
 
         # Test WITH exclusion of /usr/include
-        collector = TypeCollector("/src/main.c", exclude_system_headers=True, system_paths=[sys_path])
+        collector = TypeCollector(
+            "/src/main.c", exclude_system_headers=True, system_paths=[sys_path]
+        )
         collector.collect(mock_tu_cursor)
 
         # OverlapStruct should STILL be collected because /usr/include_extra is not /usr/include

@@ -49,7 +49,11 @@ class VSCodeIPCClient:
             active_file=data.get("active_file"),
             language_id=data.get("language_id"),
             workspace_folder=data.get("workspace_folder"),
-            window_focused=data.get("window_focused") if data.get("window_focused") is not None else False,
+            window_focused=(
+                data.get("window_focused")
+                if data.get("window_focused") is not None
+                else False
+            ),
             compilation_database_path=data.get("compilation_database_path"),
         )
 

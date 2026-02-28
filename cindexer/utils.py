@@ -48,7 +48,9 @@ class CompilationArgsResolver:
                     canonical.append(arg)
                     if i + 1 < len(args):
                         next_arg = args[i + 1]
-                        abs_path = os.path.abspath(os.path.join(self.root_dir, next_arg))
+                        abs_path = os.path.abspath(
+                            os.path.join(self.root_dir, next_arg)
+                        )
                         canonical.append(abs_path)
                         skip_next = True
                     continue

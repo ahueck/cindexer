@@ -6,7 +6,9 @@ from .formatters import Formatter, JsonFormatter, TextFormatter
 
 
 def parse_arguments():
-    parser = argparse.ArgumentParser(description="Dump user-defined types and aliases from a C/C++ source file.")
+    parser = argparse.ArgumentParser(
+        description="Dump user-defined types and aliases from a C/C++ source file."
+    )
 
     parser.add_argument(
         "--user-def",

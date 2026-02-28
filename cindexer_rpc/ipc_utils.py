@@ -17,7 +17,9 @@ def get_base_communication_dir(name: str) -> Path:
     return Path(gettempdir()) / f"{name}{suffix}"
 
 
-def get_active_session_dir(base_dir: Path, max_retries: int = 3, retry_delay: float = 0.1) -> Path:
+def get_active_session_dir(
+    base_dir: Path, max_retries: int = 3, retry_delay: float = 0.1
+) -> Path:
     """
     Resolves the active session directory by reading the 'active_session' pointer
     in the base directory. Falls back to the most recently modified session if the
