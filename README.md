@@ -36,6 +36,9 @@ python3 -m cindexer --user-def main.cpp
 ### Extension Setup (`cindexer_vscode`)
 The extension enables bi-directional communication between VS Code and Python.
 
+**Requirements:**
+* Node.js v22+
+
 **Build & Install:**
 1. `cd cindexer_vscode`
 2. `npm install && npm run compile`
