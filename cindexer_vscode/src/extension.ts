@@ -1,13 +1,13 @@
 import * as vscode from 'vscode';
 
-import {CompilationDatabaseProvider} from './compilationDatabaseProvider';
-import {getBaseCommunicationDir, initializeBaseDir} from './ipc/directory';
-import {RequestListener} from './requestListener';
-import {StatePublisher} from './statePublisher';
+import { CompilationDatabaseProvider } from './compilationDatabaseProvider';
+import { getBaseCommunicationDir, initializeBaseDir } from './ipc/directory';
+import { RequestListener } from './requestListener';
+import { StatePublisher } from './statePublisher';
 
-let publisher: StatePublisher|undefined;
-let listener: RequestListener|undefined;
-let dbProvider: CompilationDatabaseProvider|undefined;
+let publisher: StatePublisher | undefined;
+let listener: RequestListener | undefined;
+let dbProvider: CompilationDatabaseProvider | undefined;
 
 export function activate(context: vscode.ExtensionContext) {
   const baseDir = getBaseCommunicationDir('cindexer');
@@ -19,25 +19,23 @@ export function activate(context: vscode.ExtensionContext) {
     listener = new RequestListener(publisher.sessionDir, publisher);
 
     // Initial publish
-    publisher.publishState().catch(
-        err => console.error(`Error in initial publishState: ${err}`));
+    publisher.publishState().catch((err) => console.error(`Error in initial publishState: ${err}`));
 
     // Subscribe to relevant events
     context.subscriptions.push(
-        dbProvider,
-        dbProvider.onDatabaseChanged(
-            () => publisher?.publishState().catch(
-                err => console.error(`Error onDatabaseChanged: ${err}`))),
-        vscode.window.onDidChangeActiveTextEditor(
-            () => publisher?.publishState().catch(
-                err => console.error(
-                    `Error onDidChangeActiveTextEditor: ${err}`))),
-        vscode.window.onDidChangeWindowState(
-            () => publisher?.publishState().catch(
-                err => console.error(`Error onDidChangeWindowState: ${err}`))),
-        // vscode.workspace.onDidSaveTextDocument(() =>
-        // publisher?.publishState().catch(err => console.error(`Error
-        // onDidSaveTextDocument: ${err}`)))
+      dbProvider,
+      dbProvider.onDatabaseChanged(() =>
+        publisher?.publishState().catch((err) => console.error(`Error onDatabaseChanged: ${err}`)),
+      ),
+      vscode.window.onDidChangeActiveTextEditor(() =>
+        publisher?.publishState().catch((err) => console.error(`Error onDidChangeActiveTextEditor: ${err}`)),
+      ),
+      vscode.window.onDidChangeWindowState(() =>
+        publisher?.publishState().catch((err) => console.error(`Error onDidChangeWindowState: ${err}`)),
+      ),
+      // vscode.workspace.onDidSaveTextDocument(() =>
+      // publisher?.publishState().catch(err => console.error(`Error
+      // onDidSaveTextDocument: ${err}`)))
     );
 
     context.subscriptions.push({
@@ -45,9 +43,8 @@ export function activate(context: vscode.ExtensionContext) {
         listener?.dispose();
         publisher?.dispose();
         dbProvider?.dispose();
-      }
+      },
     });
-
   } catch (err) {
     vscode.window.showErrorMessage(`Failed to initialize CIndexer IPC: ${err}`);
   }

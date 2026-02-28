@@ -2,21 +2,19 @@ import * as fs from 'fs';
 import * as path from 'path';
 import * as vscode from 'vscode';
 
-import {CMakeToolsApi, getCMakeToolsApi, Version} from './cmakeApi';
+import { CMakeToolsApi, getCMakeToolsApi, Version } from './cmakeApi';
 
 export class CompilationDatabaseProvider implements vscode.Disposable {
-  private cmakeApi: CMakeToolsApi|undefined;
-  private cachedDbPath: string|null = null;
-  private lastScannedPath: string|null = null;
+  private cmakeApi: CMakeToolsApi | undefined;
+  private cachedDbPath: string | null = null;
+  private lastScannedPath: string | null = null;
   private disposables: vscode.Disposable[] = [];
 
-  private readonly _onDatabaseChanged = new vscode.EventEmitter<string|null>();
+  private readonly _onDatabaseChanged = new vscode.EventEmitter<string | null>();
   public readonly onDatabaseChanged = this._onDatabaseChanged.event;
 
-  public async getCompilationDatabasePath(activeFilePath?: string):
-      Promise<string|null> {
-    if (activeFilePath &&
-        (!this.cachedDbPath || this.shouldRescan(activeFilePath))) {
+  public async getCompilationDatabasePath(activeFilePath?: string): Promise<string | null> {
+    if (activeFilePath && (!this.cachedDbPath || this.shouldRescan(activeFilePath))) {
       await this.updateCompilationDatabase(activeFilePath);
     }
     return this.cachedDbPath;
@@ -33,16 +31,13 @@ export class CompilationDatabaseProvider implements vscode.Disposable {
     return path.dirname(activeFilePath) !== path.dirname(this.lastScannedPath);
   }
 
-  private async getCMakeApi(): Promise<CMakeToolsApi|undefined> {
+  private async getCMakeApi(): Promise<CMakeToolsApi | undefined> {
     if (!this.cmakeApi) {
       this.cmakeApi = await getCMakeToolsApi(Version.v1);
       if (this.cmakeApi) {
-        this.disposables.push(
-            this.cmakeApi.onActiveProjectChanged(() => this.updateAndNotify()));
-        this.disposables.push(
-            this.cmakeApi.onBuildTargetChanged(() => this.updateAndNotify()));
-        this.disposables.push(
-            this.cmakeApi.onLaunchTargetChanged(() => this.updateAndNotify()));
+        this.disposables.push(this.cmakeApi.onActiveProjectChanged(() => this.updateAndNotify()));
+        this.disposables.push(this.cmakeApi.onBuildTargetChanged(() => this.updateAndNotify()));
+        this.disposables.push(this.cmakeApi.onLaunchTargetChanged(() => this.updateAndNotify()));
       }
     }
     return this.cmakeApi;
@@ -50,13 +45,11 @@ export class CompilationDatabaseProvider implements vscode.Disposable {
 
   private async updateAndNotify(): Promise<void> {
     const activeEditor = vscode.window.activeTextEditor;
-    const newPath =
-        await this.updateCompilationDatabase(activeEditor?.document.uri.fsPath);
+    const newPath = await this.updateCompilationDatabase(activeEditor?.document.uri.fsPath);
     this._onDatabaseChanged.fire(newPath);
   }
 
-  public async updateCompilationDatabase(activeFilePath?: string):
-      Promise<string|null> {
+  public async updateCompilationDatabase(activeFilePath?: string): Promise<string | null> {
     if (!activeFilePath) {
       return this.cachedDbPath;
     }
@@ -90,7 +83,7 @@ export class CompilationDatabaseProvider implements vscode.Disposable {
     while (currentDir !== root) {
       const possiblePaths = [
         path.join(currentDir, 'compile_commands.json'),
-        path.join(currentDir, 'build', 'compile_commands.json')
+        path.join(currentDir, 'build', 'compile_commands.json'),
       ];
 
       for (const p of possiblePaths) {
@@ -112,7 +105,7 @@ export class CompilationDatabaseProvider implements vscode.Disposable {
   }
 
   public dispose(): void {
-    this.disposables.forEach(d => d.dispose());
+    this.disposables.forEach((d) => d.dispose());
     this.disposables = [];
     this._onDatabaseChanged.dispose();
   }

@@ -59,9 +59,7 @@ class TypeCollector:
             category, kind = self._get_category_and_kind(cursor)
 
             if category and kind and cursor.spelling:
-                self.collected_types.append(
-                    TypeInfo.from_cursor(cursor, category, kind, self.tu_source)
-                )
+                self.collected_types.append(TypeInfo.from_cursor(cursor, category, kind, self.tu_source))
 
         for child in cursor.get_children():
             self.collect(child)

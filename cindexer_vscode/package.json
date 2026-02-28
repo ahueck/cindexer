@@ -4,7 +4,8 @@
     "version": "0.0.1",
     "publisher": "ahueck",
     "engines": {
-        "vscode": "^1.85.0"
+        "vscode": "^1.85.0",
+        "node": ">=22"
     },
     "categories": [
         "Other"
@@ -18,15 +19,18 @@
         "vscode:prepublish": "npm run compile",
         "compile": "tsc -p ./",
         "watch": "tsc -watch -p ./",
-        "lint": "eslint src --ext ts"
+        "lint": "eslint src --ext ts",
+        "format": "prettier --write \"src/**/*.ts\"",
+        "format:check": "prettier --check \"src/**/*.ts\""
     },
     "devDependencies": {
+        "@types/node": "22.x",
         "@types/vscode": "^1.90.0",
-        "@types/node": "20.x",
         "@typescript-eslint/eslint-plugin": "^7.13.0",
         "@typescript-eslint/parser": "^7.13.0",
+        "@vscode/test-electron": "^2.4.0",
         "eslint": "^8.57.0",
-        "typescript": "^5.4.5",
-        "@vscode/test-electron": "^2.4.0"
+        "prettier": "^3.8.1",
+        "typescript": "^5.4.5"
     }
 }

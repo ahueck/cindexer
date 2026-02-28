@@ -11,23 +11,21 @@ export function getBaseCommunicationDir(name: string): string {
   const suffix = info.uid >= 0 ? `-${info.uid}` : '';
 
   // Prioritize environment variables to match Python's tempfile.gettempdir()
-  const tmpDir =
-      process.env.TMPDIR || process.env.TEMP || process.env.TMP || os.tmpdir();
+  const tmpDir = process.env.TMPDIR || process.env.TEMP || process.env.TMP || os.tmpdir();
 
   return path.join(tmpDir, `${name}${suffix}`);
 }
 
 export function initializeBaseDir(baseDir: string): void {
   if (!fs.existsSync(baseDir)) {
-    fs.mkdirSync(baseDir, {recursive: true, mode: 0o700});
+    fs.mkdirSync(baseDir, { recursive: true, mode: 0o700 });
   } else {
     // Security check: ensure it's a directory and owned by us
     const stats = fs.lstatSync(baseDir);
     const info = os.userInfo();
 
     if (!stats.isDirectory() || stats.isSymbolicLink()) {
-      throw new Error(
-          `Invalid communication directory: ${baseDir} is not a directory`);
+      throw new Error(`Invalid communication directory: ${baseDir} is not a directory`);
     }
 
     // On POSIX, check ownership
@@ -41,6 +39,6 @@ export function initializeBaseDir(baseDir: string): void {
 
   const sessionsDir = path.join(baseDir, 'sessions');
   if (!fs.existsSync(sessionsDir)) {
-    fs.mkdirSync(sessionsDir, {recursive: true, mode: 0o700});
+    fs.mkdirSync(sessionsDir, { recursive: true, mode: 0o700 });
   }
 }

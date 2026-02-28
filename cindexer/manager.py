@@ -21,9 +21,7 @@ class IndexManager:
         self.args_resolver = CompilationArgsResolver(self.project_root)
         self.db_handler = DatabaseHandler(build_dir)
 
-    def _resolve_signature(
-        self, source_file: str, extra_args: Optional[List[str]]
-    ) -> Tuple[str, ...]:
+    def _resolve_signature(self, source_file: str, extra_args: Optional[List[str]]) -> Tuple[str, ...]:
         db_args = self.db_handler.get_compile_args(source_file)
         full_args = (db_args or []) + (extra_args or [])
         return self.args_resolver.resolve(full_args, source_file)
@@ -107,9 +105,7 @@ class IndexManager:
 
                 system_paths = []
                 if exclude_isystem:
-                    system_paths = CompilationArgsResolver.extract_isystem_paths(
-                        tuple(parse_args)
-                    )
+                    system_paths = CompilationArgsResolver.extract_isystem_paths(tuple(parse_args))
 
                 collector = TypeCollector(
                     source_file,
@@ -129,9 +125,7 @@ class IndexManager:
                         if not path.startswith(self.project_root):
                             is_system = True
 
-                        dependencies[path] = DependencyInfo(
-                            path=path, mtime=mtime, is_system=is_system
-                        )
+                        dependencies[path] = DependencyInfo(path=path, mtime=mtime, is_system=is_system)
                     except OSError:
                         pass
 
@@ -156,9 +150,7 @@ class IndexManager:
         """Clears the entire translation unit cache."""
         self.cache.clear()
 
-    def clear_cache_for_tu(
-        self, source_file: str, extra_args: Optional[List[str]] = None
-    ) -> bool:
+    def clear_cache_for_tu(self, source_file: str, extra_args: Optional[List[str]] = None) -> bool:
         """
         Removes a specific translation unit from the cache.
         Requires the same source file and arguments used during parsing.

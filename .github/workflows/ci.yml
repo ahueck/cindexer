@@ -62,11 +62,43 @@ jobs:
           CINDEXER_USE_COVERAGE: "1"
         run: |
           lit -j 1 -v cindexer/tests/
-          PYTHONPATH=. python3 -m coverage run --rcfile=.coveragerc -p -m unittest cindexer_rpc.tests.test_ipc
+          python3 -m coverage run --rcfile=.coveragerc -p -m unittest discover -s cindexer_rpc -t .
 
       - name: Generate coverage report
         run: |
           coverage combine cindexer/tests/ .
           coverage report
+
+  vscode-extension:
+    name: Build VS Code Extension
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: "cindexer_vscode/.nvmrc"
+          cache: "npm"
+          cache-dependency-path: "cindexer_vscode/package-lock.json"
+
+      - name: Install dependencies
+        run: npm --color ci
+        working-directory: cindexer_vscode
+
+      - name: Run lint
+        run: npm run lint
+        working-directory: cindexer_vscode
+
+      - name: Check formatting
+        run: npm run format:check
+        working-directory: cindexer_vscode
+
+      - name: Run compile
+        run: npm run compile
+        working-directory: cindexer_vscode
 
       

@@ -32,9 +32,7 @@ if use_coverage:
     rc_file = os.path.join(project_root, ".coveragerc")
     executable_cmd = f"{python_exec} -m coverage run --rcfile={rc_file} -p"
     config.environment["COVERAGE_PROCESS_START"] = rc_file
-    config.environment["COVERAGE_FILE"] = os.path.join(
-        project_root, "cindexer", "tests", ".coverage"
-    )
+    config.environment["COVERAGE_FILE"] = os.path.join(project_root, "cindexer", "tests", ".coverage")
 else:
     executable_cmd = python_exec
 
