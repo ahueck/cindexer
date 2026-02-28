@@ -32,31 +32,43 @@ export class StatePublisher {
         vscode.workspace.workspaceFolders?.[0];
 
     const state = {
-      schemaVersion: 1,
-      sessionId: this.sessionId,
+      schema_version: 1,
+      session_id: this.sessionId,
       timestamp: Date.now(),
-      activeFile: activeFilePath || null,
-      languageId: activeEditor?.document.languageId || null,
-      workspaceFolder: workspaceFolder?.uri.fsPath || null,
-      windowFocused: vscode.window.state.focused,
-      compilationDatabasePath:
+      active_file: activeFilePath || null,
+      language_id: activeEditor?.document.languageId || null,
+      workspace_folder: workspaceFolder?.uri.fsPath || null,
+      window_focused: vscode.window.state.focused,
+      compilation_database_path:
           await this.dbProvider.getCompilationDatabasePath(activeFilePath)
     };
 
     // Atomic write via temp file
-    const tmpPath = `${this.statePath}.tmp`;
-    fs.writeFileSync(tmpPath, JSON.stringify(state, null, 2) + '\n');
-    fs.renameSync(tmpPath, this.statePath);
+    const tmpStatePath = `${this.statePath}.tmp`;
+    await fs.promises.writeFile(
+        tmpStatePath, JSON.stringify(state, null, 2) + '\n');
+    await fs.promises.rename(tmpStatePath, this.statePath);
 
-    fs.writeFileSync(this.activeSessionPath, this.sessionId);
+    const tmpSessionPath = `${this.activeSessionPath}.tmp`;
+    await fs.promises.writeFile(tmpSessionPath, this.sessionId);
+    await fs.promises.rename(tmpSessionPath, this.activeSessionPath);
   }
 
   public dispose(): void {
     try {
+      if (fs.existsSync(this.activeSessionPath)) {
+        const currentActive =
+            fs.readFileSync(this.activeSessionPath, 'utf-8').trim();
+        if (currentActive === this.sessionId) {
+          fs.rmSync(this.activeSessionPath, {force: true});
+        }
+      }
+
       if (fs.existsSync(this.sessionDir)) {
         fs.rmSync(this.sessionDir, {recursive: true, force: true});
       }
     } catch (e) {
+      // Ignored
     }
   }
 }

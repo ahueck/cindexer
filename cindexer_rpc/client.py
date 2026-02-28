@@ -41,14 +41,14 @@ class VSCodeIPCClient:
         data = json.loads(state_file.read_text())
         
         return VSCodeState(
-            schema_version=data.get("schemaVersion"),
-            session_id=data.get("sessionId"),
+            schema_version=data.get("schema_version"),
+            session_id=data.get("session_id"),
             timestamp=data.get("timestamp"),
-            active_file=data.get("activeFile"),
-            language_id=data.get("languageId"),
-            workspace_folder=data.get("workspaceFolder"),
-            window_focused=data.get("windowFocused") if data.get("windowFocused") is not None else False,
-            compilation_database_path=data.get("compilationDatabasePath")
+            active_file=data.get("active_file"),
+            language_id=data.get("language_id"),
+            workspace_folder=data.get("workspace_folder"),
+            window_focused=data.get("window_focused") if data.get("window_focused") is not None else False,
+            compilation_database_path=data.get("compilation_database_path")
         )
 
     def is_alive(self) -> bool:
@@ -70,7 +70,7 @@ class VSCodeIPCClient:
         request_path = session_dir / "python_request.json"
         
         request = {
-            "requestId": request_id,
+            "request_id": request_id,
             "type": request_type,
             "data": data or {},
             "timestamp": int(__import__("time").time() * 1000)

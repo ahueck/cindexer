@@ -34,7 +34,7 @@ export class RequestListener {
       const request = JSON.parse(content);
 
       console.log(
-          `Received CIndexer request: ${request.type} (${request.requestId})`);
+          `Received CIndexer request: ${request.type} (${request.request_id})`);
 
       switch (request.type) {
         case 'get_state':

@@ -28,14 +28,14 @@ class TestIPC(unittest.TestCase):
         
         state_file = session_dir / "vscode_state.json"
         state_data = {
-            "schemaVersion": 1,
-            "sessionId": session_id,
+            "schema_version": 1,
+            "session_id": session_id,
             "timestamp": 123456789,
-            "activeFile": "/path/to/test.cpp",
-            "languageId": "cpp",
-            "workspaceFolder": "/path/to/project",
-            "windowFocused": True,
-            "compilationDatabasePath": "/path/to/project/compile_commands.json"
+            "active_file": "/path/to/test.cpp",
+            "language_id": "cpp",
+            "workspace_folder": "/path/to/project",
+            "window_focused": True,
+            "compilation_database_path": "/path/to/project/compile_commands.json"
         }
         state_file.write_text(json.dumps(state_data))
         
@@ -71,7 +71,7 @@ class TestIPC(unittest.TestCase):
         self.assertTrue(request_file.exists())
         
         req_data = json.loads(request_file.read_text())
-        self.assertEqual(req_data["requestId"], req_id)
+        self.assertEqual(req_data["request_id"], req_id)
         self.assertEqual(req_data["type"], "get_state")
         self.assertEqual(req_data["data"]["foo"], "bar")
 
