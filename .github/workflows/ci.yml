@@ -62,7 +62,7 @@ jobs:
           CINDEXER_USE_COVERAGE: "1"
         run: |
           lit -j 1 -v cindexer/tests/
-          PYTHONPATH=. python3 -m coverage run --rcfile=.coveragerc -p -m unittest cindexer_python_ipc.tests.test_ipc
+          PYTHONPATH=. python3 -m coverage run --rcfile=.coveragerc -p -m unittest cindexer_rpc.tests.test_ipc
 
       - name: Generate coverage report
         run: |

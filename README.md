@@ -5,8 +5,8 @@ A Python tool using `libclang` to parse C/C++ source files and extract user-defi
 ## Project Components
 
 - **`cindexer/`**: Core Python engine for C/C++ AST analysis.
-- **`cindexer_python_ipc/`**: A Python client library for querying the state of a running VS Code instance.
-- **`cindexer-vscode-extension/`**: A VS Code extension that publishes editor state (active file, compile commands, focus) for external tools.
+- **`cindexer_rpc/`**: A Python client library for querying the state of a running VS Code instance.
+- **`cindexer_vscode/`**: A VS Code extension that publishes editor state (active file, compile commands, focus) for external tools.
 
 ---
 
@@ -33,20 +33,20 @@ python3 -m cindexer --user-def main.cpp
 
 ## 2. VS Code Integration
 
-### Extension Setup (`cindexer-vscode-extension`)
+### Extension Setup (`cindexer_vscode`)
 The extension enables bi-directional communication between VS Code and Python.
 
 **Build & Install:**
-1. `cd cindexer-vscode-extension`
+1. `cd cindexer_vscode`
 2. `npm install && npm run compile`
 3. Sideload the extension by copying the folder to your `.vscode/extensions` directory.
 
-### Python IPC Client (`cindexer_python_ipc`)
+### Python IPC Client (`cindexer_rpc`)
 A library to query the active VS Code state on demand.
 
 **Usage:**
 ```python
-from cindexer_python_ipc import VSCodeIPCClient
+from cindexer_rpc import VSCodeIPCClient
 client = VSCodeIPCClient()
 state = client.get_current_state()
 print(f"Active File: {state.active_file}")
@@ -59,19 +59,19 @@ print(f"Compile DB: {state.compilation_database_path}")
 ### Manual Verification Tool
 Use this to verify your VS Code ↔ Python connection:
 ```bash
-python3 cindexer_python_ipc/tests/query_state.py
+python3 cindexer_rpc/tests/query_state.py
 ```
 
 ### Automated Tests
 - **Core Engine:** `lit -v cindexer/tests/` (Requires `lit` and `FileCheck`)
-- **IPC Library:** `PYTHONPATH=. python3 -m unittest cindexer_python_ipc.tests.test_ipc`
+- **IPC Library:** `PYTHONPATH=. python3 -m unittest cindexer_rpc.tests.test_ipc`
 
 ### Code Coverage
 To run tests with coverage reporting for both packages:
 ```bash
 export CINDEXER_USE_COVERAGE=1
 lit -j 1 -v cindexer/tests/
-PYTHONPATH=. python3 -m coverage run --rcfile=.coveragerc -p -m unittest cindexer_python_ipc.tests.test_ipc
+PYTHONPATH=. python3 -m coverage run --rcfile=.coveragerc -p -m unittest cindexer_rpc.tests.test_ipc
 python3 -m coverage combine cindexer/tests/ .
 python3 -m coverage report -m
 ```

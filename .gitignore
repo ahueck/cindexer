@@ -210,16 +210,8 @@ __marimo__/
 Output/*
 .lit*
 
-# --- CIndexer Extension & IPC Bridge ---
-
 # VS Code Extension build artifacts and dependencies
-cindexer-vscode-extension/node_modules/
-cindexer-vscode-extension/dist/
-cindexer-vscode-extension/out/
-cindexer-vscode-extension/*.vsix
-
-# Python IPC bridge build artifacts and cache
-cindexer_python_ipc/__pycache__/
-cindexer_python_ipc/*.egg-info/
-cindexer_python_ipc/build/
-cindexer_python_ipc/dist/
+node_modules/
+dist/
+out/
+*.vsix

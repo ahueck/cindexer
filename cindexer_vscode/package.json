@@ -1,5 +1,5 @@
 {
-    "name": "cindexer-vscode-ipc",
+    "name": "cindexer-vscode",
     "displayName": "CIndexer IPC Bridge Extension",
     "version": "0.0.1",
     "publisher": "ahueck",
