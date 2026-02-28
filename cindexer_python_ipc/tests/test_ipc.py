@@ -64,7 +64,7 @@ class TestIPC(unittest.TestCase):
         pointer_file.write_text(session_id)
 
         # 2. Send request
-        req_id = self.client.send_request("test_req", {"foo": "bar"})
+        req_id = self.client.send_request("get_state", {"foo": "bar"})
         
         # 3. Verify file exists and has correct content
         request_file = session_dir / "python_request.json"
@@ -72,7 +72,7 @@ class TestIPC(unittest.TestCase):
         
         req_data = json.loads(request_file.read_text())
         self.assertEqual(req_data["requestId"], req_id)
-        self.assertEqual(req_data["type"], "test_req")
+        self.assertEqual(req_data["type"], "get_state")
         self.assertEqual(req_data["data"]["foo"], "bar")
 
 if __name__ == "__main__":

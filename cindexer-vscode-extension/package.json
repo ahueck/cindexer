@@ -1,8 +1,8 @@
 {
-    "name": "cindexer-vscode-extension",
-    "displayName": "CIndexer VS Code Extension",
+    "name": "cindexer-vscode-ipc",
+    "displayName": "CIndexer IPC Bridge Extension",
     "version": "0.0.1",
-    "publisher": "cindexer",
+    "publisher": "ahueck",
     "engines": {
         "vscode": "^1.85.0"
     },

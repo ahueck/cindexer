@@ -26,7 +26,10 @@ export class CompilationDatabaseProvider implements vscode.Disposable {
     if (!this.lastScannedPath) {
       return true;
     }
-    // Rescan if the directory of the active file changed
+    // Rescan if the directory of the active file changed:
+    // a. src/main.cpp to src/impl.cpp -> no rescan
+    // b. src/main.cpp to lib/impl.cpp -> rescan
+    // TODO might relax
     return path.dirname(activeFilePath) !== path.dirname(this.lastScannedPath);
   }
 

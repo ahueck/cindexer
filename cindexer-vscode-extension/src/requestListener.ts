@@ -1,6 +1,5 @@
 import * as fs from 'fs';
 import * as path from 'path';
-import * as vscode from 'vscode';
 
 import {StatePublisher} from './statePublisher';
 
@@ -38,21 +37,10 @@ export class RequestListener {
           `Received CIndexer request: ${request.type} (${request.requestId})`);
 
       switch (request.type) {
-        case 'ping':
-          // Just refresh state as acknowledgement
-          this.publisher.publishState().catch(
-              err => console.error(`Error in publishState (ping): ${err}`));
-          break;
         case 'get_state':
           this.publisher.publishState().catch(
               err =>
                   console.error(`Error in publishState (get_state): ${err}`));
-          break;
-        case 'reveal_file':
-          if (request.data?.path) {
-            const uri = vscode.Uri.file(request.data.path);
-            vscode.window.showTextDocument(uri);
-          }
           break;
         default:
           console.warn(`Unknown request type: ${request.type}`);
