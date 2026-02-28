@@ -79,7 +79,7 @@ class VSCodeIPCClient:
         # Atomic write
         tmp_path = f"{request_path}.tmp"
         with open(tmp_path, "w") as f:
-            json.dump(request, f, indent=2)
+            json.dump(request, f, separators=(',', ':'))
             f.write("\n")
         
         import os

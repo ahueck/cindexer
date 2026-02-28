@@ -46,7 +46,7 @@ export class StatePublisher {
     // Atomic write via temp file
     const tmpStatePath = `${this.statePath}.tmp`;
     await fs.promises.writeFile(
-        tmpStatePath, JSON.stringify(state, null, 2) + '\n');
+        tmpStatePath, JSON.stringify(state) + '\n');
     await fs.promises.rename(tmpStatePath, this.statePath);
 
     const tmpSessionPath = `${this.activeSessionPath}.tmp`;
