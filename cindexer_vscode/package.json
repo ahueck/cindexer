@@ -31,6 +31,7 @@
         "@vscode/test-electron": "^2.4.0",
         "eslint": "^8.57.0",
         "prettier": "^3.8.1",
-        "typescript": "^5.4.5"
+        "typescript": "^5.4.5",
+        "vscode-cmake-tools": "^1.5.0"
     }
 }

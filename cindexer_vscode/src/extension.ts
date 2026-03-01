@@ -2,6 +2,7 @@ import * as vscode from 'vscode';
 
 import { CompilationDatabaseProvider } from './compilationDatabaseProvider';
 import { getBaseCommunicationDir, initializeBaseDir } from './ipc/directory';
+import { Logger } from './logger';
 import { RequestListener } from './requestListener';
 import { StatePublisher } from './statePublisher';
 
@@ -10,6 +11,9 @@ let listener: RequestListener | undefined;
 let dbProvider: CompilationDatabaseProvider | undefined;
 
 export function activate(context: vscode.ExtensionContext) {
+  Logger.init();
+  Logger.info('Activating CIndexer extension...');
+
   const baseDir = getBaseCommunicationDir('cindexer');
 
   try {

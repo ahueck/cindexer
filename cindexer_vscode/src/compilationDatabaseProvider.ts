@@ -1,8 +1,9 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import * as vscode from 'vscode';
+import { CMakeToolsApi, getCMakeToolsApi, Version } from 'vscode-cmake-tools';
 
-import { CMakeToolsApi, getCMakeToolsApi, Version } from './cmakeApi';
+import { Logger } from './logger';
 
 export class CompilationDatabaseProvider implements vscode.Disposable {
   private cmakeApi: CMakeToolsApi | undefined;
@@ -14,6 +15,7 @@ export class CompilationDatabaseProvider implements vscode.Disposable {
   public readonly onDatabaseChanged = this._onDatabaseChanged.event;
 
   public async getCompilationDatabasePath(activeFilePath?: string): Promise<string | null> {
+    Logger.info(`getCompilationDatabasePath called for: ${activeFilePath || 'none'}`);
     if (activeFilePath && (!this.cachedDbPath || this.shouldRescan(activeFilePath))) {
       await this.updateCompilationDatabase(activeFilePath);
     }
@@ -24,20 +26,28 @@ export class CompilationDatabaseProvider implements vscode.Disposable {
     if (!this.lastScannedPath) {
       return true;
     }
-    // Rescan if the directory of the active file changed:
-    // a. src/main.cpp to src/impl.cpp -> no rescan
-    // b. src/main.cpp to lib/impl.cpp -> rescan
-    // TODO might relax
-    return path.dirname(activeFilePath) !== path.dirname(this.lastScannedPath);
+    const should = path.dirname(activeFilePath) !== path.dirname(this.lastScannedPath);
+    if (should) {
+      Logger.info(
+        `Rescan triggered: directory changed from ${path.dirname(
+          this.lastScannedPath,
+        )} to ${path.dirname(activeFilePath)}`,
+      );
+    }
+    return should;
   }
 
   private async getCMakeApi(): Promise<CMakeToolsApi | undefined> {
     if (!this.cmakeApi) {
-      this.cmakeApi = await getCMakeToolsApi(Version.v1);
+      Logger.info('Querying CMake Tools API...');
+      this.cmakeApi = await getCMakeToolsApi(Version.latest);
       if (this.cmakeApi) {
+        Logger.info('Successfully obtained CMake Tools API.');
         this.disposables.push(this.cmakeApi.onActiveProjectChanged(() => this.updateAndNotify()));
         this.disposables.push(this.cmakeApi.onBuildTargetChanged(() => this.updateAndNotify()));
         this.disposables.push(this.cmakeApi.onLaunchTargetChanged(() => this.updateAndNotify()));
+      } else {
+        Logger.warn('CMake Tools API not available.');
       }
     }
     return this.cmakeApi;
@@ -51,32 +61,58 @@ export class CompilationDatabaseProvider implements vscode.Disposable {
 
   public async updateCompilationDatabase(activeFilePath?: string): Promise<string | null> {
     if (!activeFilePath) {
+      Logger.info('updateCompilationDatabase: No active file path provided.');
       return this.cachedDbPath;
     }
 
+    Logger.info(`Updating compilation database for: ${activeFilePath}`);
     this.lastScannedPath = activeFilePath;
 
-    // 1. Try CMake Tools API
-    const api = await this.getCMakeApi();
-    if (api) {
-      try {
-        const project = await api.getProject(vscode.Uri.file(activeFilePath));
-        if (project) {
-          const buildDir = await project.getBuildDirectory();
-          if (buildDir) {
-            const cmakeFile = path.join(buildDir, 'compile_commands.json');
-            if (fs.existsSync(cmakeFile)) {
-              this.cachedDbPath = cmakeFile;
-              return cmakeFile;
-            }
-          }
-        }
-      } catch (err) {
-        console.error(`Error querying CMake Tools API: ${err}`);
-      }
+    this.cachedDbPath =
+      (await this.tryFindViaCMake(activeFilePath)) ?? (await this.tryFindViaManualSearch(activeFilePath));
+
+    if (!this.cachedDbPath) {
+      Logger.warn('No compile_commands.json found.');
     }
 
-    // 2. Fallback to manual search
+    return this.cachedDbPath;
+  }
+
+  private async tryFindViaCMake(activeFilePath: string): Promise<string | null> {
+    const api = await this.getCMakeApi();
+    if (!api) {
+      return null;
+    }
+
+    try {
+      const fileUri = vscode.Uri.file(activeFilePath);
+      const folder = vscode.workspace.getWorkspaceFolder(fileUri);
+      if (!folder) {
+        Logger.warn(`No workspace folder found for: ${activeFilePath}`);
+        return null;
+      }
+
+      const cmakeProject = await api.getProject(folder.uri);
+      const buildDir = await cmakeProject?.getBuildDirectory();
+
+      if (!buildDir) {
+        Logger.warn(`No CMake project or build directory found for workspace folder: ${folder.uri.fsPath}`);
+        return null;
+      }
+      const cmakeFile = path.join(buildDir, 'compile_commands.json');
+      if (fs.existsSync(cmakeFile)) {
+        Logger.info(`Found compile_commands.json via CMake Tools: ${cmakeFile}`);
+        return cmakeFile;
+      }
+      Logger.warn(`CMake build directory exists but no compile_commands.json found at: ${cmakeFile}`);
+    } catch (err) {
+      Logger.error(`Error querying CMake Tools API: ${err}`);
+    }
+    return null;
+  }
+
+  private async tryFindViaManualSearch(activeFilePath: string): Promise<string | null> {
+    Logger.info('Falling back to manual search for compile_commands.json...');
     let currentDir = path.dirname(activeFilePath);
     const root = path.parse(currentDir).root;
 
@@ -88,7 +124,7 @@ export class CompilationDatabaseProvider implements vscode.Disposable {
 
       for (const p of possiblePaths) {
         if (fs.existsSync(p)) {
-          this.cachedDbPath = p;
+          Logger.info(`Found compile_commands.json via manual search: ${p}`);
           return p;
         }
       }
@@ -99,8 +135,7 @@ export class CompilationDatabaseProvider implements vscode.Disposable {
       }
       currentDir = parentDir;
     }
-
-    this.cachedDbPath = null;
+    Logger.info('Failed manual search for compile_commands.json');
     return null;
   }
 

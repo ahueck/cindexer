@@ -4,6 +4,7 @@ import * as path from 'path';
 import * as vscode from 'vscode';
 
 import { CompilationDatabaseProvider } from './compilationDatabaseProvider';
+import { Logger } from './logger';
 
 export class StatePublisher {
   public readonly sessionId: string;
@@ -23,14 +24,17 @@ export class StatePublisher {
     if (!fs.existsSync(this.sessionDir)) {
       fs.mkdirSync(this.sessionDir, { recursive: true });
     }
+    Logger.info(`StatePublisher initialized. Session ID: ${this.sessionId}, Session Dir: ${this.sessionDir}`);
   }
 
   public async publishState(): Promise<void> {
     const activeEditor = vscode.window.activeTextEditor;
-    const activeFilePath = activeEditor?.document.uri.fsPath;
+    const activeFilePath = activeEditor?.document.uri.scheme === 'file' ? activeEditor.document.uri.fsPath : undefined;
     const workspaceFolder = activeEditor
       ? vscode.workspace.getWorkspaceFolder(activeEditor.document.uri)
       : vscode.workspace.workspaceFolders?.[0];
+
+    const compilation_database_path = await this.dbProvider.getCompilationDatabasePath(activeFilePath);
 
     const state = {
       schema_version: 1,
@@ -40,8 +44,10 @@ export class StatePublisher {
       language_id: activeEditor?.document.languageId || null,
       workspace_folder: workspaceFolder?.uri.fsPath || null,
       window_focused: vscode.window.state.focused,
-      compilation_database_path: await this.dbProvider.getCompilationDatabasePath(activeFilePath),
+      compilation_database_path,
     };
+
+    Logger.info(`Publishing state: active_file=${state.active_file}, db=${state.compilation_database_path}`);
 
     // Atomic write via temp file
     const tmpStatePath = `${this.statePath}.tmp`;
