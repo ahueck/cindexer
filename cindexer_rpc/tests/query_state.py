@@ -30,7 +30,7 @@ def main():
 
         # 2. Send a get_state request
         print("\nSending 'get_state' request to VS Code...")
-        req_id = client.send_request("get_statess")
+        req_id = client.send_request("get_state")
         print(f"Request sent (ID: {req_id})")
 
         # 3. Wait a bit and query again

@@ -39,7 +39,6 @@ export class CompilationDatabaseProvider implements vscode.Disposable {
 
   private async getCMakeApi(): Promise<CMakeToolsApi | undefined> {
     if (!this.cmakeApi) {
-      Logger.info('Querying CMake Tools API...');
       this.cmakeApi = await getCMakeToolsApi(Version.latest);
       if (this.cmakeApi) {
         Logger.info('Successfully obtained CMake Tools API.');
@@ -61,7 +60,6 @@ export class CompilationDatabaseProvider implements vscode.Disposable {
 
   public async updateCompilationDatabase(activeFilePath?: string): Promise<string | null> {
     if (!activeFilePath) {
-      Logger.info('updateCompilationDatabase: No active file path provided.');
       return this.cachedDbPath;
     }
 
@@ -101,7 +99,6 @@ export class CompilationDatabaseProvider implements vscode.Disposable {
       }
       const cmakeFile = path.join(buildDir, 'compile_commands.json');
       if (fs.existsSync(cmakeFile)) {
-        Logger.info(`Found compile_commands.json via CMake Tools: ${cmakeFile}`);
         return cmakeFile;
       }
       Logger.warn(`CMake build directory exists but no compile_commands.json found at: ${cmakeFile}`);
@@ -135,7 +132,6 @@ export class CompilationDatabaseProvider implements vscode.Disposable {
       }
       currentDir = parentDir;
     }
-    Logger.info('Failed manual search for compile_commands.json');
     return null;
   }
 

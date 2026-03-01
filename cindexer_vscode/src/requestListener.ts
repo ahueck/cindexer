@@ -1,6 +1,7 @@
 import * as fs from 'fs';
 import * as path from 'path';
 
+import { Logger } from './logger';
 import { StatePublisher } from './statePublisher';
 
 export class RequestListener {
@@ -33,14 +34,14 @@ export class RequestListener {
       const content = fs.readFileSync(this.requestPath, 'utf-8');
       const request = JSON.parse(content);
 
-      console.log(`Received CIndexer request: ${request.type} (${request.request_id})`);
+      Logger.info(`Received CIndexer request: ${request.type} (${request.request_id})`);
 
       switch (request.type) {
         case 'get_state':
-          this.publisher.publishState().catch((err) => console.error(`Error in publishState (get_state): ${err}`));
+          this.publisher.publishState().catch((err) => Logger.error(`Error in publishState (get_state): ${err}`));
           break;
         default:
-          console.warn(`Unknown request type: ${request.type}`);
+          Logger.warn(`Unknown request type: ${request.type}`);
       }
 
       // Cleanup request file after processing (optional, but good for
@@ -49,7 +50,7 @@ export class RequestListener {
       // "Implicitly or explicitly". For now, we react by updating the state
       // file.
     } catch (err) {
-      console.error(`Error handling request: ${err}`);
+      Logger.error(`Error handling request: ${err}`);
     }
   }
 

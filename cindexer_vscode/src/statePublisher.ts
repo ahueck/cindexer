@@ -47,8 +47,6 @@ export class StatePublisher {
       compilation_database_path,
     };
 
-    Logger.info(`Publishing state: active_file=${state.active_file}, db=${state.compilation_database_path}`);
-
     // Atomic write via temp file
     const tmpStatePath = `${this.statePath}.tmp`;
     await fs.promises.writeFile(tmpStatePath, JSON.stringify(state) + '\n');

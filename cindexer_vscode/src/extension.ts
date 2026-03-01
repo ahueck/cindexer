@@ -12,7 +12,6 @@ let dbProvider: CompilationDatabaseProvider | undefined;
 
 export function activate(context: vscode.ExtensionContext) {
   Logger.init();
-  Logger.info('Activating CIndexer extension...');
 
   const baseDir = getBaseCommunicationDir('cindexer');
 
@@ -23,19 +22,19 @@ export function activate(context: vscode.ExtensionContext) {
     listener = new RequestListener(publisher.sessionDir, publisher);
 
     // Initial publish
-    publisher.publishState().catch((err) => console.error(`Error in initial publishState: ${err}`));
+    publisher.publishState().catch((err) => Logger.error(`Error in initial publishState: ${err}`));
 
     // Subscribe to relevant events
     context.subscriptions.push(
       dbProvider,
       dbProvider.onDatabaseChanged(() =>
-        publisher?.publishState().catch((err) => console.error(`Error onDatabaseChanged: ${err}`)),
+        publisher?.publishState().catch((err) => Logger.error(`Error onDatabaseChanged: ${err}`)),
       ),
       vscode.window.onDidChangeActiveTextEditor(() =>
-        publisher?.publishState().catch((err) => console.error(`Error onDidChangeActiveTextEditor: ${err}`)),
+        publisher?.publishState().catch((err) => Logger.error(`Error onDidChangeActiveTextEditor: ${err}`)),
       ),
       vscode.window.onDidChangeWindowState(() =>
-        publisher?.publishState().catch((err) => console.error(`Error onDidChangeWindowState: ${err}`)),
+        publisher?.publishState().catch((err) => Logger.error(`Error onDidChangeWindowState: ${err}`)),
       ),
       // vscode.workspace.onDidSaveTextDocument(() =>
       // publisher?.publishState().catch(err => console.error(`Error
@@ -58,4 +57,5 @@ export function deactivate() {
   listener?.dispose();
   publisher?.dispose();
   dbProvider?.dispose();
+  Logger.dispose();
 }
