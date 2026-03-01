@@ -8,7 +8,7 @@ import unittest.mock
 
 # Load cindexer module
 project_root = os.path.dirname(
-    os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 )
 sys.path.insert(0, project_root)
 from cindexer import IndexManager
@@ -17,7 +17,9 @@ from cindexer import IndexManager
 class TestIndexManager(unittest.TestCase):
     def setUp(self):
         # Create a temp source file
-        self.test_dir = os.path.join(project_root, "tests", "data", "manager_test_tmp")
+        self.test_dir = os.path.join(
+            project_root, "cindexer", "tests", "data", "manager_test_tmp"
+        )
         os.makedirs(self.test_dir, exist_ok=True)
         self.source_file = os.path.join(self.test_dir, "test.c")
         self.header_file = os.path.join(self.test_dir, "header.h")

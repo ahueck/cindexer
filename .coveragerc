@@ -3,6 +3,7 @@ branch = True
 parallel = True
 source = 
     cindexer
+    cindexer_rpc
 
 omit = 
     */tests/*
