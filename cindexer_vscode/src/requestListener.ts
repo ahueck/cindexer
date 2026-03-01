@@ -11,7 +11,7 @@ export class RequestListener {
     private readonly sessionDir: string,
     private readonly publisher: StatePublisher,
   ) {
-    this.requestPath = path.join(this.sessionDir, 'python_request.json');
+    this.requestPath = path.join(this.sessionDir, 'request.json');
     this.startWatching();
   }
 
@@ -22,7 +22,7 @@ export class RequestListener {
 
     // We watch the directory for the request file
     this.watcher = fs.watch(this.sessionDir, (event, filename) => {
-      if (filename === 'python_request.json' && fs.existsSync(this.requestPath)) {
+      if (filename === 'request.json' && fs.existsSync(this.requestPath)) {
         this.handleRequest();
       }
     });

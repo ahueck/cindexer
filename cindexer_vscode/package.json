@@ -1,6 +1,6 @@
 {
     "name": "cindexer-vscode",
-    "displayName": "CIndexer IPC Bridge Extension",
+    "displayName": "CIndexer IPC Bridge",
     "version": "0.0.1",
     "publisher": "ahueck",
     "engines": {

@@ -68,7 +68,7 @@ class TestIPC(unittest.TestCase):
         req_id = self.client.send_request("get_state", {"foo": "bar"})
 
         # 3. Verify file exists and has correct content
-        request_file = session_dir / "python_request.json"
+        request_file = session_dir / "request.json"
         self.assertTrue(request_file.exists())
 
         req_data = json.loads(request_file.read_text())

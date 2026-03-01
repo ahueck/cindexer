@@ -67,14 +67,14 @@ class VSCodeIPCClient:
 
     def send_request(self, request_type: str, data: Optional[dict] = None) -> str:
         """
-        Writes a request to python_request.json in the active session directory.
+        Writes a request to request.json in the active session directory.
         Returns a unique request ID (UUID).
         """
         import uuid
 
         request_id = str(uuid.uuid4())
         session_dir = get_active_session_dir(self.base_dir)
-        request_path = session_dir / "python_request.json"
+        request_path = session_dir / "request.json"
 
         request = {
             "request_id": request_id,
